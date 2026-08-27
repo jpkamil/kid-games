@@ -1,4 +1,4 @@
-<title>Star Wrecker</title>
+<title>Star Wrecker v0.2</title>
 <script>
 /* The host owns <head>, so establish the mobile viewport before first layout. */
 (function(){
@@ -10,7 +10,7 @@
   meta('apple-mobile-web-app-capable','yes');
   meta('mobile-web-app-capable','yes');
   meta('apple-mobile-web-app-status-bar-style','black-translucent');
-  meta('apple-mobile-web-app-title','Star Wrecker');
+  meta('apple-mobile-web-app-title','Star Wrecker 2');
   meta('theme-color','#05060f');
   meta('color-scheme','dark');
 })();
@@ -104,7 +104,8 @@ body{
   -webkit-clip-path:polygon(50% 0,100% 78%,72% 100%,28% 100%,0 78%);clip-path:polygon(50% 0,100% 78%,72% 100%,28% 100%,0 78%);
   filter:drop-shadow(0 0 5px var(--cool))}
 .pip.spent{background:var(--edge);filter:none;opacity:.5}
-.wep{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+.wep{-webkit-appearance:none;appearance:none;cursor:pointer;min-height:44px;touch-action:manipulation;background:rgba(8,12,28,.55);border:1.5px solid var(--edge);border-radius:11px;padding:7px 11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;-webkit-tap-highlight-color:transparent;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+.wep:active{transform:scale(.94)}
 .wep b{color:var(--cool);font-weight:700;letter-spacing:.1em}
 
 /* overdrive */
@@ -204,7 +205,7 @@ body{
   <div class="hud-bot">
     <div>
       <div class="lives" id="lives"></div>
-      <div class="wep" id="wep">Cannon <b>I</b></div>
+      <button class="wep" id="wep" aria-label="Swap weapon">Cannon <b>I</b></button>
     </div>
     <button class="od" id="od" aria-label="Overdrive">
       <div class="fillbar" id="odFill" style="height:0%"></div>
@@ -720,16 +721,40 @@ const FACTS=[
 /* ================= game state ================= */
 let T,tKey,bossImg=null,bossReady=false;
 let P=null, bullets=[], foes=[], ebul=[], drops=[], parts=[], stars=[];
-let boss=null, wave=1, score=0, combo=0, mult=1, od=0, lives=3, tier=1, shield=0;
+let waveAge=0;
+let boss=null, wave=1, score=0, combo=0, mult=1, od=0, lives=3, tier=1, shield=0, shieldMax=1;
 let spawnQ=[], spawnT=0, state='menu', shake=0, flashT=0, last=0, runKills=0, waveClearT=0;
 let bossPending=0;
 
 const TIERS=[
   {n:'Cannon',r:'I',  cd:0.165,dmg:1},    /*  6 dps */
-  {n:'Twin',  r:'II', cd:0.175,dmg:1},    /* 11 dps */
-  {n:'Spread',r:'III',cd:0.185,dmg:1},    /* 16 dps, but the outer shots often miss */
+  {n:'Twin',  r:'II', cd:0.150,dmg:1},    /* 11 dps */
+  {n:'Spread',r:'III',cd:0.135,dmg:1},    /* 16 dps, but the outer shots often miss */
   {n:'Lance', r:'IV', cd:0.115,dmg:1.3}   /* 34 dps, pierces */
 ];
+
+/* ===== v0.2 SWAPPABLE WEAPONS =====
+   Tap the weapon chip to cycle anything unlocked. Weapon pickups raise your tier
+   to IV first, then start unlocking new guns. Each fires a different pattern. */
+const GUNS=[
+  {id:'cannon', n:'Cannon',   ic:'|',  cd:0.165, dmg:1,   c:'#fff5dd'},
+  {id:'scatter',n:'Scatter',  ic:'W',  cd:0.30,  dmg:0.8, c:'#ffd07a'},
+  {id:'lance',  n:'Lance',    ic:'!',  cd:0.115, dmg:1.3, c:'#c9f6ff'},
+  {id:'seeker', n:'Seeker',   ic:'@',  cd:0.42,  dmg:1.6, c:'#b9f5a0'},
+  {id:'ricochet',n:'Ricochet',ic:'X',  cd:0.24,  dmg:1.1, c:'#f7a8ff'}
+];
+let gun=0, unlocked=[true,false,false,false,false];
+function gunUnlockNext(){
+  for(let i=1;i<GUNS.length;i++) if(!unlocked[i]){
+    unlocked[i]=true; sfx.power(); banner('NEW GUN: '+GUNS[i].n.toUpperCase()); updHUD(); return true; }
+  return false;
+}
+function cycleGun(){
+  const have=GUNS.map((g,i)=>i).filter(i=>unlocked[i]);
+  if(have.length<2) return;
+  gun=have[(have.indexOf(gun)+1)%have.length];
+  sfx.tap(); banner(GUNS[gun].n.toUpperCase()); updHUD();
+}
 
 /* ================= theme ================= */
 function applyTheme(k){
@@ -844,12 +869,22 @@ const FOE={
   rusher :{hp:1, r:14, sc:16, spd:245, size:25, cost:1.2},
   weaver :{hp:2, r:17, sc:26, spd:88,  size:31, cost:2,   shoot:2.3},
   turret :{hp:4, r:21, sc:48, spd:52,  size:37, cost:3.5, shoot:1.55, halt:0.30},
-  brute  :{hp:9, r:29, sc:95, spd:40,  size:53, cost:7,   shoot:2.7,  halt:0.22}
+  brute  :{hp:9, r:29, sc:95, spd:40,  size:53, cost:7,   shoot:2.7,  halt:0.22},
+  /* v0.2 MINI-BOSS. A fat little gunship that shows up mid-wave, takes real shooting
+     to put down, and pesters you with aimed triple bursts while it hangs around. */
+  elite  :{hp:26,r:33, sc:320,spd:34,  size:62, cost:11,  shoot:1.5,  halt:0.16, mini:true}
 };
+
+/* Everything gets a nudge tougher and quicker as the waves climb. Gentle on purpose:
+   about +4% health and +2% speed per wave, capped, so wave 20 is a real step up from
+   wave 5 without turning into a wall. */
+function foeScale(){ return {hp:1+Math.min(1.6,wave*0.04), spd:1+Math.min(0.55,wave*0.02)}; }
 function spawnFoe(type,x){
+  const SC=foeScale();
   const d=FOE[type];
-  foes.push({type,x,y:-40,r:d.r,hp:d.hp,max:d.hp,sc:d.sc,size:d.size,
-    bx:x, ph:Math.random()*6.283, t:0, st:d.shoot?rnd(0.6,d.shoot):0,
+  const hp=Math.max(1,Math.round(d.hp*SC.hp));
+  foes.push({type,x,y:-40,r:d.r,hp,max:hp,sc:Math.round(d.sc*SC.hp),size:d.size,spdMul:SC.spd,
+    bx:x, ph:Math.random()*6.283, t:0, st:d.shoot?rnd(0.6,d.shoot):0, mini:!!d.mini,
     glyph:pick(T.ammo), hit:0, held:false});
 }
 function updateFoes(dt){
@@ -857,14 +892,20 @@ function updateFoes(dt){
     const f=foes[i], d=FOE[f.type];
     f.t+=dt; if(f.hit>0) f.hit-=dt;
     switch(f.type){
-      case 'drifter': f.y+=d.spd*dt; f.x=f.bx+Math.sin(f.t*1.9+f.ph)*48; break;
-      case 'rusher':  f.y+=d.spd*dt; f.x+=Math.sin(f.t*4+f.ph)*22*dt;    break;
-      case 'weaver':  f.y+=d.spd*dt; f.x=f.bx+Math.sin(f.t*2.4+f.ph)*72;
+      case 'drifter': f.y+=(d.spd*(f.spdMul||1))*dt; f.x=f.bx+Math.sin(f.t*1.9+f.ph)*48; break;
+      case 'rusher':  f.y+=(d.spd*(f.spdMul||1))*dt; f.x+=Math.sin(f.t*4+f.ph)*22*dt;    break;
+      case 'weaver':  f.y+=(d.spd*(f.spdMul||1))*dt; f.x=f.bx+Math.sin(f.t*2.4+f.ph)*72;
                       f.y+=Math.sin(f.t*3.1)*26*dt; break;
       case 'turret':
       case 'brute': {
         const stop=H*d.halt;
-        if(f.y<stop) f.y+=d.spd*dt; else { f.held=true; f.x=f.bx+Math.sin(f.t*0.85+f.ph)*84; }
+        if(f.y<stop) f.y+=(d.spd*(f.spdMul||1))*dt; else { f.held=true; f.x=f.bx+Math.sin(f.t*0.85+f.ph)*84; }
+        break; }
+      case 'elite': {                       // mini-boss: slides in, then prowls across the top
+        const stop=H*d.halt;
+        if(f.y<stop) f.y+=(d.spd*(f.spdMul||1))*dt;
+        else { f.held=true; f.x=f.bx+Math.sin(f.t*0.7+f.ph)*Math.min(140,W*0.34);
+               f.y=stop+Math.sin(f.t*1.4)*16; }
         break; }
     }
     f.x=clamp(f.x,26,W-26);
@@ -877,6 +918,13 @@ function updateFoes(dt){
   }
 }
 function foeShoot(f){
+  if(f.mini){                               // three-shot aimed burst, the annoying cannon
+    const aim=Math.atan2(P.y-f.y,P.x-f.x), sp=1+Math.min(0.45,wave*0.015);
+    for(let k=-1;k<=1;k++)
+      ebul.push({x:f.x,y:f.y+16,vx:Math.cos(aim+k*0.17)*230*sp,vy:Math.sin(aim+k*0.17)*230*sp,r:6});
+    sfx.pop(); return;
+  }
+
   const a=Math.atan2(P.y-f.y,P.x-f.x);
   const sp=1+Math.min(0.45,wave*0.015);          // bullets get nastier deeper in
   if(f.type==='brute'){
@@ -955,7 +1003,7 @@ function takeDrop(d){
   if(d.k==='w'){
     if(tier<4){ tier++; sfx.power(); banner('WEAPON UP'); } else { addScore(250); sfx.pick(); }
     updHUD();
-  } else if(d.k==='s'){ shield=1; sfx.power(); }
+  } else if(d.k==='s'){ shield=shieldMax; sfx.power(); if(shieldMax>1) banner('SHIELD x'+shieldMax); }
   else if(d.k==='star'){ addScore(60); od=Math.min(100,od+9); sfx.pick(); }
   else if(d.k==='life'){ lives=Math.min(4,lives+1); sfx.power(); banner('EXTRA LIFE'); updHUD(); }
   burst(d.x,d.y,10,DROP[d.k].c,170,0.4);
@@ -963,20 +1011,41 @@ function takeDrop(d){
 
 /* ================= player weapons ================= */
 function shoot(){
-  const w=TIERS[tier-1], y=P.y-20;
-  const mk=(x,vx,vy)=>bullets.push({x,y,vx,vy,r:4,dmg:w.dmg,pierce:tier===4});
-  if(tier===1) mk(P.x,0,-620);
-  else if(tier===2){ mk(P.x-8,0,-640); mk(P.x+8,0,-640); }
-  else if(tier===3){ mk(P.x,0,-660); mk(P.x-7,-165,-620); mk(P.x+7,165,-620); }
-  else { mk(P.x-9,0,-780); mk(P.x+9,0,-780); mk(P.x,0,-820); }
-  tier===4?sfx.laser():sfx.shot();
+  const y=P.y-20, G=GUNS[gun], w=TIERS[tier-1];
+  const dmg=w.dmg*G.dmg;
+  const mk=(x,vx,vy,extra)=>bullets.push(Object.assign({x,y,vx,vy,r:4,dmg,col:G.c},extra||{}));
+  if(G.id==='cannon'){
+    if(tier===1) mk(P.x,0,-620);
+    else if(tier===2){ mk(P.x-8,0,-640); mk(P.x+8,0,-640); }
+    else if(tier===3){ mk(P.x,0,-660); mk(P.x-7,-165,-620); mk(P.x+7,165,-620); }
+    else { mk(P.x,0,-700); mk(P.x-9,-90,-680); mk(P.x+9,90,-680); }
+    sfx.shot();
+  } else if(G.id==='scatter'){
+    const n=3+2*(tier-1);                              // ALWAYS ODD: there must be a centre shot
+    for(let i=0;i<n;i++){ const a=-Math.PI/2+(i-(n-1)/2)*0.10;
+      mk(P.x,Math.cos(a)*540,Math.sin(a)*540); }
+    sfx.shot();
+  } else if(G.id==='lance'){
+    mk(P.x,0,-980,{pierce:true,r:3});
+    if(tier>=3){ mk(P.x-11,0,-980,{pierce:true,r:3}); mk(P.x+11,0,-980,{pierce:true,r:3}); }
+    sfx.laser();
+  } else if(G.id==='seeker'){
+    const n=tier>=3?2:1;
+    for(let i=0;i<n;i++) mk(P.x+(i?12:-12)*(n-1),rnd(-70,70),-380,{home:1,r:5});
+    sfx.pop();
+  } else {                                             // ricochet
+    mk(P.x,0,-620,{bounce:3,r:5});                    // centre shot at EVERY tier
+    mk(P.x-6,-90,-560,{bounce:3,r:5});
+    mk(P.x+6, 90,-560,{bounce:3,r:5});
+    sfx.shot();
+  }
 }
 function drawBullets(){
   for(const b of bullets){
     g.save(); g.translate(b.x,b.y);
-    g.shadowColor=tier===4?'#43e8ff':T.glow; g.shadowBlur=13;
-    g.fillStyle=tier===4?'#c9f6ff':'#fff5dd';
-    if(tier===4){ g.fillRect(-2.2,-13,4.4,20); }
+    g.shadowColor=b.col||T.glow; g.shadowBlur=13;
+    g.fillStyle=b.col||'#fff5dd';
+    if(b.pierce){ g.fillRect(-2.2,-13,4.4,20); }
     else { g.beginPath(); g.ellipse(0,0,3.1,7.4,0,0,6.283); g.fill(); }
     g.restore(); g.shadowBlur=0;
   }
@@ -992,12 +1061,279 @@ function drawBullets(){
 }
 
 /* ================= boss ================= */
+/* ===== v0.2 BOSS ROSTER =====
+   Four bosses on a rotation, drawn on the canvas so no artwork has to load.
+   Each has its own attack set and they get meaner as the waves climb.
+   Wave 5 octopus -> 10 zombie cop -> 15 the seasonal boss (original art) -> 20 the Professor. */
+let bolts=[];                                   // telegraphed lightning columns
+
+function bossFor(w){
+  const n=Math.floor(w/5);                      // 1,2,3,4,5...
+  return [OCTO,COP,LUNCH,THEMEBOSS,PROF][(n-1)%5];
+}
+
+const OCTO={
+  id:'octo', name:'Zap, the Electric Space Octopus', hpMul:1.0, tint:'#7cf0ff',
+  draw(b){
+    const t=b.t, mad=b.phase>=3;
+    g.shadowBlur=0;
+    // ---- eight tentacles, tapered, curling, with suckers ----
+    for(let i=0;i<8;i++){
+      const base=-1.15+i*0.33, curl=Math.sin(t*2.6+i*0.85)*0.6;
+      g.save(); g.rotate(base);
+      g.lineCap='round';
+      let px=0, py=30;
+      for(let seg=0;seg<4;seg++){
+        const nx=Math.sin(curl*(seg+1))*(seg+1)*14, ny=30+(seg+1)*23;
+        g.strokeStyle=seg%2?'#6d3fd6':'#7b4ae0'; g.lineWidth=17-seg*3.4;
+        g.beginPath(); g.moveTo(px,py);
+        g.quadraticCurveTo(Math.sin(curl*(seg+0.5))*(seg+0.5)*14, py+11, nx, ny);
+        g.stroke();
+        g.fillStyle='#c9a7ff';                                   // suckers
+        g.beginPath(); g.arc(nx*0.72,py+11,Math.max(1.6,3.6-seg*0.7),0,6.283); g.fill();
+        px=nx; py=ny;
+      }
+      g.restore();
+    }
+    // ---- bulbous alien head ----
+    g.fillStyle='#7c4ddb'; g.strokeStyle='#341a6e'; g.lineWidth=4.5;
+    g.beginPath(); g.ellipse(0,-14,62,56,0,0,6.283); g.fill(); g.stroke();
+    g.fillStyle='rgba(255,255,255,.14)';
+    g.beginPath(); g.ellipse(-20,-38,28,14,-0.42,0,6.283); g.fill();
+    // three little head-nubs, because aliens
+    g.fillStyle='#6d3fd6';
+    for(let i=-1;i<=1;i++){ g.beginPath();
+      g.ellipse(i*26,-66+Math.abs(i)*7,7,12+Math.sin(t*4+i)*2,i*0.3,0,6.283); g.fill(); g.stroke(); }
+    // ---- giant bulging eyes ----
+    const lx=clamp((P.x-b.x)/30,-9,9), ly=clamp((P.y-b.y)/55,-7,7);
+    for(const sx of [-1,1]){
+      g.fillStyle='#fdfdff'; g.strokeStyle='#341a6e'; g.lineWidth=4;
+      g.beginPath(); g.ellipse(sx*25,-22,21,24,0,0,6.283); g.fill(); g.stroke();
+      g.fillStyle=mad?'#ffe14d':'#ffd24a';                       // alien iris
+      g.beginPath(); g.arc(sx*25+lx,-22+ly,11,0,6.283); g.fill();
+      g.fillStyle='#0b0f22';                                     // slit pupil
+      g.beginPath(); g.ellipse(sx*25+lx,-22+ly,4,9,0,0,6.283); g.fill();
+      g.fillStyle='rgba(255,255,255,.85)';
+      g.beginPath(); g.arc(sx*25+lx-4,-27+ly,3.2,0,6.283); g.fill();
+    }
+    // ---- angry brows: lower and steeper when he is furious ----
+    g.strokeStyle='#2a1560'; g.lineWidth=7; g.lineCap='round';
+    const bw=mad?0.62:0.40, drop=mad?4:0;
+    for(const sx of [-1,1]){
+      g.beginPath();
+      g.moveTo(sx*9,-44+drop);
+      g.lineTo(sx*44,-44+drop+Math.sin(bw)*26*(sx>0?1:1)*0.9);
+      g.stroke();
+    }
+    // ---- big toothy grin ----
+    g.save();
+    g.beginPath(); g.ellipse(0,14,34,mad?21:16,0,0,6.283); g.clip();
+    g.fillStyle='#2b0f3d'; g.fillRect(-40,-10,80,60);
+    g.fillStyle='#fffaf0';
+    for(let i=0;i<7;i++){                                        // upper fangs
+      const x=-30+i*10;
+      g.beginPath(); g.moveTo(x,-4); g.lineTo(x+10,-4); g.lineTo(x+5,10+(i%2)*4); g.closePath(); g.fill();
+    }
+    for(let i=0;i<6;i++){                                        // lower fangs
+      const x=-26+i*10;
+      g.beginPath(); g.moveTo(x,40); g.lineTo(x+10,40); g.lineTo(x+5,26-(i%2)*4); g.closePath(); g.fill();
+    }
+    g.fillStyle='#e0568f';                                       // tongue
+    g.beginPath(); g.ellipse(0,26+Math.sin(t*6)*2,13,7,0,0,6.283); g.fill();
+    g.restore();
+    g.strokeStyle='#341a6e'; g.lineWidth=4;
+    g.beginPath(); g.ellipse(0,14,34,mad?21:16,0,0,6.283); g.stroke();
+    // ---- electric crackle around him ----
+    g.strokeStyle='#7cf0ff'; g.lineWidth=3.5; g.shadowColor='#7cf0ff'; g.shadowBlur=16;
+    for(let i=0;i<4;i++){
+      const a=t*5+i*1.57, r0=60, r1=r0+18+Math.sin(t*9+i)*8;
+      g.beginPath(); g.moveTo(Math.cos(a)*r0,Math.sin(a)*r0*0.9-14);
+      g.lineTo(Math.cos(a+0.13)*((r0+r1)/2),Math.sin(a+0.13)*((r0+r1)/2)*0.9-14);
+      g.lineTo(Math.cos(a)*r1,Math.sin(a)*r1*0.9-14); g.stroke();
+    }
+    g.shadowBlur=0; g.lineCap='butt';
+  },
+  fire(b,aim){
+    if(b.phase>=2 && Math.random()<0.55){        // lightning columns: warn, then strike
+      const n=b.phase===3?3:2;
+      for(let i=0;i<n;i++) bolts.push({x:rnd(20,W-20), warn:0.85, live:0, w:36});
+      banner('LIGHTNING'); sfx.warn(); return;
+    }
+    const n=b.phase===3?14:10;
+    for(let i=0;i<n;i++){ const a=i/n*6.283+b.t;
+      ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*(150+b.phase*22),vy:Math.sin(a)*(150+b.phase*22),r:6}); }
+    sfx.pop();
+  }
+};
+
+const COP={
+  id:'cop', name:'Officer Grumbles, Zombie School Cop', hpMul:1.25, tint:'#7bdc7b',
+  draw(b){
+    const t=b.t;
+    g.fillStyle='#2b3a6b'; g.strokeStyle='#16224a'; g.lineWidth=4;   // body
+    g.beginPath(); g.roundRect(-46,6,92,66,14); g.fill(); g.stroke();
+    g.fillStyle='#7bdc7b';                                            // head
+    g.beginPath(); g.arc(0,-26,40,0,6.283); g.fill(); g.stroke();
+    g.fillStyle='#1d2a55';                                            // hat
+    g.beginPath(); g.roundRect(-44,-70,88,24,8); g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(-52,-50,104,12,6); g.fill(); g.stroke();
+    g.fillStyle='#ffd24a'; g.beginPath();                             // badge
+    for(let i=0;i<5;i++){ const a=-Math.PI/2+i*1.2566;
+      g.lineTo(Math.cos(a)*11,-60+Math.sin(a)*11); g.lineTo(Math.cos(a+0.63)*5,-60+Math.sin(a+0.63)*5); }
+    g.closePath(); g.fill();
+    g.fillStyle='#fff'; g.beginPath(); g.arc(-14,-28,11,0,6.283); g.arc(14,-28,11,0,6.283); g.fill();
+    g.fillStyle='#c22'; g.beginPath();
+    g.arc(-14+Math.sin(t*2)*3,-28,5,0,6.283); g.arc(14+Math.sin(t*2)*3,-28,5,0,6.283); g.fill();
+    g.strokeStyle='#0b0f22'; g.lineWidth=3;                            // grumpy mouth
+    g.beginPath(); g.arc(0,-4,16,3.6,5.8); g.stroke();
+  },
+  fire(b,aim){
+    if(b.phase>=2 && Math.random()<0.4){ banner('DETENTION'); for(let i=0;i<3;i++) spawnFoe('rusher',rnd(60,W-60)); sfx.warn(); return; }
+    if(b.phase===3 && Math.random()<0.45){       // whistle shockwave: a ring with one gap to slip through
+      const gap=Math.random()*6.283;
+      for(let i=0;i<22;i++){ const a=i/22*6.283;
+        if(Math.abs(((a-gap+Math.PI)%6.283)-Math.PI)<0.5) continue;
+        ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*205,vy:Math.sin(a)*205,r:7}); }
+      banner('WHISTLE!'); sfx.warn(); return;
+    }
+    for(let k=-2;k<=2;k++)                        // donut volley
+      ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.18)*(210+b.phase*20),vy:Math.sin(aim+k*0.18)*(210+b.phase*20),r:7});
+    sfx.pop();
+  }
+};
+
+const LUNCH={
+  id:'lunch', name:'Lunchlady Gorgonzola', hpMul:1.4, tint:'#a7e05a',
+  draw(b){
+    const t=b.t;
+    g.fillStyle='#e9eef7'; g.strokeStyle='#9aa6bd'; g.lineWidth=4;        // apron
+    g.beginPath(); g.roundRect(-50,2,100,72,14); g.fill(); g.stroke();
+    g.fillStyle='#f2c9a0'; g.beginPath(); g.arc(0,-28,38,0,6.283); g.fill(); g.stroke();
+    g.fillStyle='#fff'; g.beginPath();                                     // hairnet puff
+    g.ellipse(0,-58,44,22,0,0,6.283); g.fill(); g.stroke();
+    g.strokeStyle='#c8d0e0'; g.lineWidth=1.5;
+    for(let i=-4;i<=4;i++){ g.beginPath(); g.moveTo(i*9,-72); g.lineTo(i*7,-44); g.stroke(); }
+    g.fillStyle='#0b0f22'; g.strokeStyle='#0b0f22'; g.lineWidth=3;
+    g.beginPath(); g.arc(-14,-30,4,0,6.283); g.arc(14,-30,4,0,6.283); g.fill();
+    g.beginPath(); g.arc(0,-10,14,0.4,2.7); g.stroke();                    // unimpressed
+    g.save(); g.rotate(Math.sin(t*2.4)*0.5); g.translate(52,10);           // ladle
+    g.strokeStyle='#b8c2d4'; g.lineWidth=7; g.beginPath(); g.moveTo(0,-26); g.lineTo(0,10); g.stroke();
+    g.fillStyle='#b8c2d4'; g.beginPath(); g.arc(0,16,13,0,6.283); g.fill();
+    g.fillStyle='#a7e05a'; g.beginPath(); g.arc(0,14,9,0,6.283); g.fill();
+    g.restore();
+  },
+  fire(b,aim){
+    if(b.phase>=2 && Math.random()<0.42){          // mystery-meat lobs that rain down lanes
+      for(let i=0;i<3;i++) bolts.push({x:rnd(20,W-20), warn:0.95, live:0, w:30});
+      banner('MYSTERY MEAT'); sfx.warn(); return;
+    }
+    const n=b.phase===3?9:6;                       // slow fat globs, arcing
+    for(let i=0;i<n;i++){ const a=aim+(i-(n-1)/2)*0.26;
+      ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*(150+b.phase*18),vy:Math.sin(a)*(150+b.phase*18),r:9}); }
+    if(b.phase===3 && Math.random()<0.5) spawnFoe('elite',rnd(70,W-70));
+    sfx.pop();
+  }
+};
+
+const PROF={
+  id:'prof', name:'Professor Von Homework', hpMul:1.6, tint:'#ff7a5c',
+  draw(b){
+    const t=b.t;
+    g.fillStyle='#233047'; g.strokeStyle='#121a2c'; g.lineWidth=4;
+    g.beginPath(); g.roundRect(-52,4,104,72,12); g.fill(); g.stroke();
+    g.fillStyle='#f2d3a8'; g.beginPath(); g.arc(0,-28,38,0,6.283); g.fill(); g.stroke();
+    g.fillStyle='#1b2436';                                            // mortarboard
+    g.beginPath(); g.moveTo(-56,-58); g.lineTo(56,-58); g.lineTo(34,-46); g.lineTo(-34,-46);
+    g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle='#ffd24a'; g.lineWidth=3; g.beginPath();
+    g.moveTo(46,-58); g.quadraticCurveTo(60,-40+Math.sin(t*3)*6,52,-22); g.stroke();
+    g.strokeStyle='#121a2c'; g.lineWidth=4;                            // spectacles
+    g.beginPath(); g.arc(-15,-30,13,0,6.283); g.arc(15,-30,13,0,6.283); g.moveTo(-2,-30); g.lineTo(2,-30); g.stroke();
+    g.fillStyle='#c22'; g.beginPath(); g.arc(-15,-30,5,0,6.283); g.arc(15,-30,5,0,6.283); g.fill();
+    g.strokeStyle='#0b0f22'; g.beginPath(); g.arc(0,-2,15,3.5,5.9); g.stroke();
+    g.font='bold 20px ui-monospace,monospace'; g.fillStyle='#ff7a5c'; g.textAlign='center';
+    g.fillText(['x\u00b2','\u03c0r\u00b2','7\u00d78','\u221a49'][Math.floor(t*1.4)%4],0,58);
+  },
+  fire(b,aim){
+    if(b.phase>=2 && Math.random()<0.4){          // pop quiz: lightning + adds together
+      for(let i=0;i<2;i++) bolts.push({x:rnd(20,W-20), warn:0.7, live:0, w:40});
+      spawnFoe('turret',rnd(60,W-60));
+      banner('POP QUIZ'); sfx.warn(); return;
+    }
+    const n=b.phase===3?20:14;                    // homework spiral
+    for(let i=0;i<n;i++){ const a=i/n*6.283+b.t*2.1;
+      ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*(185+b.phase*25),vy:Math.sin(a)*(185+b.phase*25),r:6}); }
+    if(b.phase===3) for(let k=-1;k<=1;k++)
+      ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.14)*300,vy:Math.sin(aim+k*0.14)*300,r:8});
+    sfx.pop();
+  }
+};
+
+/* the original seasonal boss, artwork and all, kept as the third slot */
+const THEMEBOSS={
+  id:'theme', name:null, hpMul:1.15, tint:null,
+  draw(b){
+    if(bossReady && bossImg){
+      g.drawImage(bossImg,-95,-81,190,162);
+      if(b.hit>0){ g.globalCompositeOperation='lighter'; g.globalAlpha=clamp(b.hit*4,0,0.75);
+        g.drawImage(bossImg,-95,-81,190,162);
+        g.globalCompositeOperation='source-over'; g.globalAlpha=1; }
+    } else { g.fillStyle=T.accent; g.beginPath(); g.arc(0,0,58,0,6.283); g.fill(); }
+  },
+  fire(b,aim){
+    if(b.phase===1){
+      for(let i=0;i<12;i++){ const a=i/12*6.283+b.t;
+        ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*172,vy:Math.sin(a)*172,r:6}); }
+    } else if(b.phase===2){
+      if(Math.random()<0.45){ for(let i=0;i<2;i++) spawnFoe('rusher',rnd(60,W-60)); banner('INCOMING'); }
+      else for(let k=-2;k<=2;k++)
+        ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.2)*215,vy:Math.sin(aim+k*0.2)*215,r:6});
+    } else {
+      for(let i=0;i<16;i++){ const a=i/16*6.283+b.t*1.7;
+        ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*195,vy:Math.sin(a)*195,r:6}); }
+      for(let k=-1;k<=1;k++)
+        ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.16)*260,vy:Math.sin(aim+k*0.16)*260,r:7});
+    }
+    sfx.pop();
+  }
+};
+
+/* ---- lightning columns: warn where, then strike. Always dodgeable. ---- */
+function updBolts(dt){
+  for(let i=bolts.length-1;i>=0;i--){
+    const L=bolts[i];
+    if(L.warn>0){ L.warn-=dt; if(L.warn<=0){ L.live=0.34; sfx.boom(); shake=Math.max(shake,10); } }
+    else if(L.live>0){
+      L.live-=dt;
+      if(state==='playing' && Math.abs(P.x-L.x)<L.w*0.5-P.r*0.25 && P.inv<=0) hurt();
+    } else bolts.splice(i,1);
+  }
+}
+function drawBolts(){
+  for(const L of bolts){
+    if(L.warn>0){
+      g.globalAlpha=0.20+Math.abs(Math.sin(L.warn*26))*0.30;
+      g.fillStyle='#7cf0ff'; g.fillRect(L.x-L.w*0.5,0,L.w,H); g.globalAlpha=1;
+    } else if(L.live>0){
+      g.save(); g.shadowColor='#7cf0ff'; g.shadowBlur=26;
+      g.strokeStyle='#eafcff'; g.lineWidth=L.w*0.5; g.globalAlpha=clamp(L.live*3,0,1);
+      g.beginPath(); let y=0,x=L.x; g.moveTo(x,y);
+      while(y<H){ y+=26; x=L.x+rnd(-11,11); g.lineTo(x,y); }
+      g.stroke(); g.restore(); g.globalAlpha=1;
+    }
+  }
+}
+
 function spawnBoss(){
   const tough=1+Math.floor(wave/5);
-  boss={hp:150+wave*22, max:150+wave*22, x:W/2, y:-120, ty:H*0.20,
-        t:0, atk:1.6, warn:0, phase:1, hit:0, dir:Math.random()<.5?-1:1, tough};
-  $('bossbar').classList.add('on'); $('bossName').textContent=T.bossName;
-  banner('!! '+T.bossName.toUpperCase()+' !!'); sfx.warn();
+  const D=bossFor(wave);
+  const base=(150+wave*22)*D.hpMul;
+  boss={hp:base, max:base, x:W/2, y:-120, ty:H*0.20,
+        t:0, atk:1.6, warn:0, phase:1, hit:0, dir:Math.random()<.5?-1:1, tough, def:D};
+  bolts=[];
+  const nm=D.name||T.bossName;
+  $('bossbar').classList.add('on'); $('bossName').textContent=nm;
+  banner('!! '+nm.toUpperCase()+' !!'); sfx.warn();
 }
 function updateBoss(dt){
   const b=boss; b.t+=dt; if(b.hit>0) b.hit-=dt;
@@ -1016,47 +1352,30 @@ function updateBoss(dt){
   }
   b.atk-=dt;
   if(b.atk<=0){
-    b.atk = b.phase===3?1.15 : b.phase===2?1.5 : 1.95;
+    const ramp=Math.max(0.6,1-wave*0.012);          // fires faster the deeper you get
+    b.atk = (b.phase===3?1.15 : b.phase===2?1.5 : 1.95)*ramp;
     b.warn=0.42; sfx.warn();
   }
 }
 function bossFire(){
   const b=boss, aim=Math.atan2(P.y-b.y,P.x-b.x);
-  if(b.phase===1){
-    for(let i=0;i<12;i++){ const a=i/12*6.283+b.t;
-      ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*172,vy:Math.sin(a)*172,r:6}); }
-  } else if(b.phase===2){
-    if(Math.random()<0.45){
-      for(let i=0;i<2;i++) spawnFoe('rusher',rnd(60,W-60));
-      banner('INCOMING');
-    } else {
-      for(let k=-2;k<=2;k++)
-        ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.2)*215,vy:Math.sin(aim+k*0.2)*215,r:6});
-    }
-  } else {
-    for(let i=0;i<16;i++){ const a=i/16*6.283+b.t*1.7;
-      ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*195,vy:Math.sin(a)*195,r:6}); }
-    for(let k=-1;k<=1;k++)
-      ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.16)*260,vy:Math.sin(aim+k*0.16)*260,r:7});
-  }
-  sfx.pop();
+  (b.def||THEMEBOSS).fire(b,aim);
 }
 function drawBoss(){
-  const b=boss;
+  const b=boss, D=b.def||THEMEBOSS;
   g.save(); g.translate(b.x,b.y);
   const wob=1+Math.sin(b.t*2.2)*0.02;
   g.scale(wob,wob);
   if(b.warn>0 && Math.floor(b.warn*18)%2===0){ g.shadowColor='#fff'; g.shadowBlur=34; }
-  else { g.shadowColor=T.accent2; g.shadowBlur=20; }
-  if(bossReady && bossImg){
-    g.drawImage(bossImg,-95,-81,190,162);
-    if(b.hit>0){ g.globalCompositeOperation='lighter'; g.globalAlpha=clamp(b.hit*4,0,0.75);
-      g.drawImage(bossImg,-95,-81,190,162);
-      g.globalCompositeOperation='source-over'; g.globalAlpha=1; }
-  } else {
-    g.fillStyle=T.accent; g.beginPath(); g.arc(0,0,58,0,6.283); g.fill();
+  else { g.shadowColor=D.tint||T.accent2; g.shadowBlur=20; }
+  g.lineJoin='round';
+  D.draw(b);
+  if(b.hit>0 && D.id!=='theme'){
+    g.globalAlpha=clamp(b.hit*3.5,0,0.6); g.fillStyle='#fff';
+    g.beginPath(); g.arc(0,-6,74,0,6.283); g.fill(); g.globalAlpha=1;
   }
   g.restore(); g.shadowBlur=0;
+  g.textAlign='left';
 }
 function killBoss(){
   const b=boss;
@@ -1066,8 +1385,10 @@ function killBoss(){
   },i*95);
   sfx.bigboom(); shake=26; flashT=0.3;
   addScore(700+wave*90);
-  boss=null; $('bossbar').classList.remove('on');
+  boss=null; bolts=[]; $('bossbar').classList.remove('on');
   banner('WRECKED!');
+  if(shieldMax<3){ shieldMax++; shield=shieldMax; setTimeout(()=>banner('SHIELD UPGRADE x'+shieldMax),900); }
+  if(!gunUnlockNext()) addScore(400);
   od=Math.min(100,od+30);
 }
 </script>
@@ -1076,9 +1397,9 @@ function killBoss(){
 "use strict";
 /* ================= waves ================= */
 function startWave(n){
-  wave=n; updHUD(); spawnQ=[]; spawnT=0;
+  wave=n; updHUD(); spawnQ=[]; spawnT=0; waveAge=0;
   if(n%5===0){ banner('WAVE '+n); bossPending=1.15; return; }
-  let budget=5+n*3.7, tAcc=0.5;
+  let budget=5+n*3.7+Math.max(0,n-10)*1.6, tAcc=Math.max(0.28,0.5-n*0.006);
   const unlock=[['drifter',1],['rusher',2],['weaver',3],['turret',5],['brute',7]];
   const pool=unlock.filter(u=>n>=u[1]).map(u=>u[0]);
   let guard=0;
@@ -1089,6 +1410,11 @@ function startWave(n){
     spawnQ.push({type:t,at:tAcc,x:rnd(48,W-48)});
     tAcc+=rnd(0.26,0.72);
   }
+  if(n>=6 && n%5!==0){
+    const minis=n>=12?2:1;
+    for(let i=0;i<minis;i++) spawnQ.push({type:'elite',at:1.6+i*3.4+rnd(0,1.2),x:rnd(70,W-70)});
+  }
+  spawnQ.sort((a,b)=>a.at-b.at);        // elites were appended after the budget entries
   banner('WAVE '+n);
 }
 function pumpWave(dt){
@@ -1101,6 +1427,13 @@ function pumpWave(dt){
   while(spawnQ.length && spawnQ[0].at<=spawnT){
     const s=spawnQ.shift(); spawnFoe(s.type,s.x);
   }
+  if(!spawnQ.length && foes.length && !boss){
+    waveAge+=dt;
+    if(waveAge>45){                        // nothing but parked foes for 45s: let them leave
+      for(const f of foes) if(f.held){ f.held=false; f.y+=170*dt; }
+      if(waveAge>60){ foes.length=0; banner('THEY RETREATED'); waveAge=0; }
+    }
+  } else waveAge=0;
   if(!spawnQ.length && !foes.length && !boss){
     waveClearT-=dt;
     if(waveClearT<=0){ waveClearT=1.6; startWave(wave+1); }
@@ -1124,7 +1457,7 @@ function hurt(){
   combo=0; bumpCombo();
   burst(P.x,P.y,20,'#ff4d6d',250,0.62);
   shake=16; sfx.ouch(); P.inv=1.25;
-  if(shield>0){ shield=0; banner('SHIELD DOWN'); return; }
+  if(shield>0){ shield--; banner(shield>0?('SHIELD '+shield+' LEFT'):'SHIELD DOWN'); P.inv=Math.max(P.inv,0.9); return; }
   if(tier>1){ tier--; updHUD(); banner('WEAPON DOWN'); return; }
   lives--; updHUD(); flashT=0.26;
   if(lives<0) gameOver(); else banner('SHIP LOST');
@@ -1147,11 +1480,31 @@ function nova(){
 function collide(dt){
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
+    if(b.bcd>0) b.bcd-=dt;
+    if(b.home){                                        // seekers steer to the nearest target
+      let tx=null,ty=null,bd=1e9;
+      if(boss&&boss.y>0){ tx=boss.x; ty=boss.y; bd=Math.hypot(b.x-tx,b.y-ty); }
+      for(const f of foes){ const d=Math.hypot(b.x-f.x,b.y-f.y); if(d<bd){ bd=d; tx=f.x; ty=f.y; } }
+      if(tx!==null){
+        const want=Math.atan2(ty-b.y,tx-b.x), cur=Math.atan2(b.vy,b.vx);
+        let d=want-cur; while(d>Math.PI)d-=6.283; while(d<-Math.PI)d+=6.283;
+        const a=cur+clamp(d,-3.4*dt,3.4*dt), sp=Math.hypot(b.vx,b.vy)+260*dt;
+        b.vx=Math.cos(a)*Math.min(sp,760); b.vy=Math.sin(a)*Math.min(sp,760);
+      }
+      if(Math.random()<0.5) burst(b.x,b.y,1,b.col||'#b9f5a0',40,0.18);
+    }
     b.x+=b.vx*dt; b.y+=b.vy*dt;
+    if(b.bounce>0){                                    // ricochet off the side walls
+      if(b.x<6){ b.x=6; b.vx=Math.abs(b.vx); b.bounce--; sfx.tap(); }
+      else if(b.x>W-6){ b.x=W-6; b.vx=-Math.abs(b.vx); b.bounce--; sfx.tap(); }
+    }
     let gone=false;
     if(boss && boss.y>0 && Math.hypot(b.x-boss.x,b.y-boss.y)<64){
-      boss.hp-=b.dmg*1.6; boss.hit=0.12;
-      burst(b.x,b.y,3,'#fff',110,0.2);
+      if(!b.pierce || !(b.bcd>0)){                 // a pierce bullet may not re-hit every frame
+        boss.hp-=b.dmg*1.6; boss.hit=0.12;
+        burst(b.x,b.y,3,'#fff',110,0.2);
+        if(b.pierce) b.bcd=0.12;
+      }
       if(!b.pierce) gone=true;
       if(boss.hp<=0){ killBoss(); }
     }
@@ -1159,6 +1512,11 @@ function collide(dt){
       for(let j=0;j<foes.length;j++){
         const f=foes[j];
         if(Math.hypot(b.x-f.x,b.y-f.y)<f.r+b.r){
+          if(b.pierce){                      // one hit per target, ever
+            if(!b.seen) b.seen=[];
+            if(b.seen.indexOf(f)>=0) continue;
+            b.seen.push(f);
+          }
           f.hp-=b.dmg; f.hit=0.11;
           burst(b.x,b.y,3,T.glow,120,0.2);
           if(!b.pierce) gone=true;
@@ -1166,7 +1524,7 @@ function collide(dt){
         }
       }
     }
-    if(gone||b.y<-30||b.x<-40||b.x>W+40) bullets.splice(i,1);
+    if(gone||b.y<-30||b.y>H+40||b.x<-40||b.x>W+40) bullets.splice(i,1);
   }
   for(let i=ebul.length-1;i>=0;i--){
     const b=ebul[i];
@@ -1186,8 +1544,9 @@ function collide(dt){
 function updHUD(){
   $('score').textContent=money(score);
   $('wave').textContent=wave;
-  const w=TIERS[tier-1];
-  $('wep').innerHTML=w.n+' <b>'+w.r+'</b>';
+  const w=TIERS[tier-1], G=GUNS[gun], many=unlocked.filter(Boolean).length>1;
+  $('wep').innerHTML=G.n+' <b>'+w.r+'</b>'+(many?' <span style="opacity:.55">\u21bb</span>':'');
+  $('wep').style.color=G.c;
   let h='';
   for(let i=0;i<Math.max(lives+1,0);i++) h+='<div class="pip"></div>';
   $('lives').innerHTML=h;
@@ -1232,6 +1591,8 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
 $('od').addEventListener('click',nova);
+$('wep').addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); cycleGun(); });
+$('wep').addEventListener('touchstart',function(e){ e.preventDefault(); e.stopPropagation(); cycleGun(); },{passive:false});
 $('pauseBtn').addEventListener('click',()=>{ state==='playing'?pause():(state==='paused'&&resume()); });
 
 /* ================= loop ================= */
@@ -1251,12 +1612,13 @@ function update(dt){
   P.thrust=clamp(Math.abs(P.x-px)*0.06,0,1);
 
   P.fire-=dt;
-  if(P.fire<=0){ P.fire=TIERS[tier-1].cd; shoot(); }
+  if(P.fire<=0){ P.fire=TIERS[tier-1].cd*(GUNS[gun].cd/0.165); shoot(); }
 
   pumpWave(dt);
   updateFoes(dt);
   if(boss){
     updateBoss(dt);
+    updBolts(dt);
     $('bossFill').style.width=clamp(boss.hp/boss.max*100,0,100)+'%';
   }
   updateDrops(dt);
@@ -1276,6 +1638,7 @@ function draw(dt){
   if(shake>0.2) g.translate(rnd(-shake,shake)*0.5,rnd(-shake,shake)*0.5);
   drawStars(dt);
   drawDrops();
+  drawBolts();
   if(boss) drawBoss();
   drawFoes();
   drawBullets();
@@ -1300,6 +1663,7 @@ function newRun(){
   bullets=[];foes=[];ebul=[];drops=[];parts=[];
   boss=null; $('bossbar').classList.remove('on');
   score=0; combo=0; mult=1; od=0; lives=3; tier=1; shield=0; runKills=0;
+  gun=0; unlocked=[true,false,false,false,false]; bolts=[]; shieldMax=1;
   wave=0; waveClearT=1.6; spawnQ=[]; spawnT=0; shake=0; flashT=0; bossPending=0;
   P=newShip(); seedStars();
   bumpCombo(); updHUD(); updOD();
@@ -1375,7 +1739,7 @@ $('soundBtn').addEventListener('click',cycleAudio);
 function menu(){
   hideCard();
   showCard(`<h1>STAR<br>WRECKER</h1>
-    <p class="small">Drag to fly. You shoot automatically. Wreck everything.</p>
+    <p class="small">Drag to fly. You shoot automatically. Tap your weapon to swap it. Wreck everything.</p>
     <div class="stats">
       <div class="stat"><div class="v">${money(SV.hi)}</div><div class="k">Best score</div></div>
       <div class="stat"><div class="v">${SV.bw}</div><div class="k">Best wave</div></div>
@@ -1399,7 +1763,9 @@ function how(){
       <li>Kills without getting hit build a <b>combo</b> &mdash; up to <b>x5 score</b>. Getting hit resets it.</li>
       <li>When <b>OVERDRIVE</b> lights up, tap it: everything on screen takes a hit and all enemy
         fire is wiped. Save it for the boss.</li>
-      <li>Every <b>5th wave</b> is a boss. It changes its attack pattern as its health drops.</li>
+      <li>Every <b>5th wave</b> is a boss, and they take turns: the <b>Electric Space Octopus</b>, <b>Officer Grumbles</b> the zombie school cop, <b>Lunchlady Gorgonzola</b>, the seasonal monster, then <b>Professor Von Homework</b>. Each changes its attack as its health drops.</li>
+      <li>Beat a boss and you <b>unlock a new gun</b>. Tap the weapon name at the bottom left to <b>swap</b> between the ones you have &mdash; Cannon, Scatter, Lance, Seeker, Ricochet.</li>
+      <li>A glowing blue column means <b>lightning is about to hit that lane</b>. Move.</li>
     </ul>
     <p class="small">Keyboard: arrows or WASD to fly, space for overdrive, P to pause.</p>
     <button class="big" id="backBtn">GOT IT</button>`);
