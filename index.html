@@ -1,4 +1,4 @@
-<title>Star Wrecker v0.2</title>
+<title>Star Wrecker v0.3</title>
 <script>
 /* The host owns <head>, so establish the mobile viewport before first layout. */
 (function(){
@@ -106,6 +106,20 @@ body{
 .pip.spent{background:var(--edge);filter:none;opacity:.5}
 .wep{-webkit-appearance:none;appearance:none;cursor:pointer;min-height:44px;touch-action:manipulation;background:rgba(8,12,28,.55);border:1.5px solid var(--edge);border-radius:11px;padding:7px 11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;-webkit-tap-highlight-color:transparent;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:6px}
 .wep:active{transform:scale(.94)}
+/* v0.3 hull meter: the ship gets a health bar too, not just the bosses */
+.hull{width:clamp(96px,31vw,138px);margin-top:7px}
+.hull .lb{font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.hull .trk{height:10px;background:rgba(6,8,20,.85);border:1.5px solid var(--edge);
+  border-radius:99px;overflow:hidden}
+.hull .fl{height:100%;width:100%;border-radius:99px;transition:width .16s;
+  background:linear-gradient(90deg,var(--good),var(--cool))}
+.hull.low .fl{background:linear-gradient(90deg,#ffb347,var(--accent))}
+.hull.crit .fl{background:linear-gradient(90deg,var(--hot),var(--accent));
+  animation:hullcrit .7s ease-in-out infinite}
+@keyframes hullcrit{0%,100%{opacity:1}50%{opacity:.4}}
+.hull.bump{animation:hullbump .24s}
+@keyframes hullbump{0%{transform:none}30%{transform:translateX(-5px) scale(1.07)}
+  62%{transform:translateX(5px)}100%{transform:none}}
 .wep b{color:var(--cool);font-weight:700;letter-spacing:.1em}
 
 /* overdrive */
@@ -142,10 +156,12 @@ body{
 
 /* ---------------- overlays ---------------- */
 .veil{position:fixed;inset:0;z-index:10;background:rgba(4,5,14,.9);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  display:grid;place-items:center;padding:18px;overflow-y:auto}
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(18px + env(safe-area-inset-bottom,0px));
+  overflow-y:auto;-webkit-overflow-scrolling:touch}
 .veil[hidden]{display:none}
 .card{background:var(--void2);border:1.5px solid var(--edge);border-radius:20px;padding:22px 20px;
-  max-width:400px;width:100%;text-align:center;display:flex;flex-direction:column;gap:13px;
+  max-width:400px;width:100%;text-align:center;margin:auto 0;display:flex;flex-direction:column;gap:13px;
   box-shadow:0 20px 50px rgba(0,0,0,.7);animation:rise .32s cubic-bezier(.3,1.2,.5,1)}
 @keyframes rise{0%{transform:translateY(16px);opacity:0}100%{transform:none;opacity:1}}
 .card h1{font-family:'Luckiest Guy',cursive;font-size:clamp(32px,10vw,46px);line-height:.95;
@@ -179,8 +195,55 @@ body{
   border-radius:10px;padding:8px 6px;font-family:inherit;font-size:12px;cursor:pointer;transition:.14s}
 .seasons button:hover,.seasons button[aria-pressed="true"]{border-color:var(--accent);color:var(--glow)}
 
+/* ---------------- THE TINKER DECK ---------------- */
+.deckhead{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.knob{background:var(--void);border:1.5px solid var(--edge);border-radius:14px;
+  padding:11px 11px 9px;text-align:left;display:flex;flex-direction:column;gap:7px}
+.knob.flag{border-color:var(--accent);box-shadow:0 0 0 1px rgba(255,138,43,.25)}
+.knobtop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.knobtop code{font-family:'Roboto Mono',ui-monospace,monospace;font-size:11.5px;
+  color:var(--cool);letter-spacing:.02em;word-break:break-all}
+.kv{font-family:'Roboto Mono',ui-monospace,monospace;font-size:15px;font-weight:700;
+  color:var(--glow);white-space:nowrap}
+.kv small{font-size:9.5px;color:var(--dim);font-weight:400;margin-left:3px}
+.kbar{height:6px;background:rgba(6,8,20,.9);border-radius:99px;overflow:hidden}
+.kbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));
+  border-radius:99px;transition:width .12s}
+.knote{font-size:11.5px;color:var(--dim);line-height:1.4}
+.krow{display:flex;gap:6px}
+.kbtn{flex:1;min-height:44px;border-radius:11px;border:1.5px solid var(--edge);
+  background:var(--panel);color:var(--chalk);font-family:'Roboto Mono',ui-monospace,monospace;
+  font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent}
+.kbtn:active{transform:translateY(2px);border-color:var(--accent)}
+.ksrc{font-family:'Roboto Mono',ui-monospace,monospace;font-size:10.5px;line-height:1.5;
+  color:#a9ffd0;background:#04060f;border:1px solid var(--edge);border-radius:9px;
+  padding:8px 9px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  white-space:pre-wrap;overflow-wrap:break-word}
+.ksrc b{color:var(--glow);font-weight:700}
+.ksrc i{color:#6e7ba6;font-style:normal}
+.deckwrap{display:flex;flex-direction:column;gap:9px}
+.deckfoot{position:sticky;bottom:0;background:var(--void2);
+  padding:9px 0 calc(4px + env(safe-area-inset-bottom,0px));
+  display:flex;gap:8px;margin-top:2px;box-shadow:0 -12px 16px -6px var(--void2)}
+.deckfoot .ghost,.deckfoot .big{flex:1;margin:0;display:grid;place-items:center;min-height:52px}
+.deckfoot .ghost{font-size:12.5px;line-height:1.25}
+.bosspick{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.bosspick button{min-height:44px;background:var(--void);border:1.5px solid var(--edge);
+  color:var(--chalk);border-radius:11px;padding:8px 6px;font-family:inherit;font-size:11.5px;
+  cursor:pointer;touch-action:manipulation}
+.bosspick button[aria-pressed="true"]{border-color:var(--accent);color:var(--glow)}
+.xplain{background:var(--void);border:1.5px solid var(--accent);border-radius:13px;
+  padding:11px;text-align:left;font-size:12.5px;line-height:1.55;display:flex;
+  flex-direction:column;gap:9px}
+.xplain h3{font-family:'Luckiest Guy',cursive;font-weight:400;font-size:17px;color:var(--accent);
+  letter-spacing:.5px}
+.xbtn{background:var(--panel);border:1.5px dashed var(--accent);color:var(--glow);
+  border-radius:11px;min-height:44px;padding:10px;font-family:inherit;font-size:12.5px;
+  cursor:pointer;touch-action:manipulation}
+
 @media (prefers-reduced-motion:reduce){
-  .od.ready,.banner.show,.combo.pop{animation:none}
+  .od.ready,.banner.show,.combo.pop,.hull.bump,.hull.crit .fl{animation:none}
 }
 </style>
 
@@ -205,6 +268,10 @@ body{
   <div class="hud-bot">
     <div>
       <div class="lives" id="lives"></div>
+      <div class="hull" id="hull">
+        <div class="lb">Hull</div>
+        <div class="trk"><div class="fl" id="hullFill" style="width:100%"></div></div>
+      </div>
       <button class="wep" id="wep" aria-label="Swap weapon">Cannon <b>I</b></button>
     </div>
     <button class="od" id="od" aria-label="Overdrive">
@@ -284,7 +351,7 @@ const THEMES = {
   },
   hanukkah:{
     label:'Hanukkah',
-    ammo:['\ud83d\udd4e','\ud83e\udd54','\ud83e\ude99'],
+    ammo:['\ud83c\udf69','\ud83e\udd54','\ud83e\ude99'],
     music:{root:57,scale:[0,1,4,5,7,8,10],tempo:104,wave:'triangle',vol:.038,mel:[0,1,4,3,0,1,4,null,5,4,3,1,0,null,null,null],bass:[0,0,3,4]}, accent:'#5aa9e6', accent2:'#f2d675', glow:'#ffe08a',
     tile:'#eef4fb', bossName:'The Dreidel Golem',
     fall:'spark', fallColors:['#f2d675','#5aa9e6','#ffffff','#a5d8ff'],
@@ -465,30 +532,40 @@ const THEMES = {
   },
   school:{
     label:'Back to School',
-    ammo:['\u270f','\ud83d\udcda','\ud83c\udf4e'],
-    music:{root:57,scale:[0,2,3,5,7,8,10],tempo:100,wave:'square',vol:.034,mel:[0,0,2,3,2,0,null,0,3,3,4,3,2,0,null,null],bass:[0,0,4,4]}, accent:'#5b93de', accent2:'#e0a33c', glow:'#ffd98a',
-    tile:'#f2f5fa', bossName:'Professor Von Homework',
-    fall:'paper', fallColors:['#f2f5fa','#5b93de','#e0a33c'],
-    taunts:['I have assigned you a worksheet. It is forty pages. It is due NOW.',
-      'Show your work. SHOW IT.','I confiscated a paper airplane in 1987 and I still have it.',
-      'This will be on the test. Everything will be on the test.',
-      'You cannot defeat me. I have tenure.'],
-    attacks:['assigns surprise homework','snaps a ruler on the desk','hurls a chalky eraser',
-      'reads the syllabus aloud. All of it.','marks you down for handwriting'],
+    /* v0.3: nothing school-shaped gets shot any more. Pencils stay -- a pencil is
+       just a pointy space-javelin. Everything else is what lives at the bottom of
+       a locker: flies, a gym sock, and a cloud of pure stink. */
+    ammo:['\u270f','\ud83e\udeb0','\ud83e\udde6','\ud83d\udca8'],
+    music:{root:57,scale:[0,2,3,5,7,8,10],tempo:100,wave:'square',vol:.034,mel:[0,0,2,3,2,0,null,0,3,3,4,3,2,0,null,null],bass:[0,0,4,4]}, accent:'#5b93de', accent2:'#8fbf3f', glow:'#ffd98a',
+    tile:'#f2f5fa', bossName:'The Gym Sock Goblin',
+    fall:'paper', fallColors:['#f2f5fa','#5b93de','#8fbf3f'],
+    taunts:['I have been in the Lost and Found since NOVEMBER. Smell me. SMELL ME.',
+      'Nobody claimed me. So now I am a MONSTER. Their loss.',
+      'I am one sock. There is another one. You do not want to meet the other one.',
+      'I have my own weather. It is green and it is humid.',
+      'Do not put me in the wash. I will only get ANGRIER and CLEANER.'],
+    attacks:['unleashes a truly historic whiff','flops damply onto your shoe',
+      'flings a fistful of dryer lint','honks like a wet trumpet',
+      'summons a small personal cloud of flies'],
     art:()=>`
-      <rect x="56" y="62" width="88" height="96" rx="8" fill="#f2f5fa"/>
-      <g stroke="#c3cfe0" stroke-width="2.5">
-        <path d="M68 128h64M68 140h64M68 152h44"/></g>
-      <path d="M56 62h88v10H56z" fill="#5b93de"/>
-      <path d="M42 44l58-22 58 22-58 20z" fill="#2f4f7d"/>
-      <rect x="86" y="52" width="28" height="9" rx="3" fill="#2f4f7d"/>
-      <path d="M158 44v26" stroke="#e0a33c" stroke-width="3.5" stroke-linecap="round"/>
-      <circle cx="158" cy="74" r="5" fill="#e0a33c"/>
-      ${eyes(80,120,98,12,'#2f4f7d')}
-      <g fill="none" stroke="#2f4f7d" stroke-width="3.5">
-        <circle cx="80" cy="98" r="16"/><circle cx="120" cy="98" r="16"/>
-        <path d="M96 98h8M64 94l-10-4M136 94l10-4"/></g>
-      ${grin('M86 124q14 11 28 0q-14 5-28 0z','#2f4f7d')}`
+      <g stroke="#8fbf3f" stroke-width="4.5" fill="none" stroke-linecap="round" opacity=".8">
+        <path d="M54 40q-9-11 1-19t2-15M146 42q9-11-1-19t-2-15M100 24q-8-9 0-17"/>
+      </g>
+      <path d="M62 44h72v58q0 11 11 15l24 9q17 6 13 21t-23 13l-38-5q-59-8-59-64z"
+        fill="#e8eef8" stroke="#aab8d0" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M62 44h72v13H62z" fill="#e05a3c"/>
+      <path d="M62 61h72v8H62z" fill="#4b7fd0"/>
+      <g fill="#b9cf7a" opacity=".8">
+        <ellipse cx="86" cy="141" rx="13" ry="8"/>
+        <ellipse cx="130" cy="129" rx="9" ry="6"/>
+        <ellipse cx="72" cy="112" rx="7" ry="5"/>
+      </g>
+      <circle cx="171" cy="132" r="10" fill="#9bd14a" stroke="#6f9c2c" stroke-width="2.5"/>
+      ${eyes(86,116,92,13,'#2f3f5d')}
+      <path d="M74 76q10-7 20-2M108 74q10-6 20 1" stroke="#2f3f5d" stroke-width="4"
+        fill="none" stroke-linecap="round"/>
+      ${grin('M78 116q22 24 46 2q-10 3-14-4q-7 8-13 0q-6 7-13 2z','#2f3f5d')}
+      <ellipse cx="101" cy="163" rx="30" ry="6" fill="#000" opacity=".25"/>`
   }
 };
 
@@ -552,7 +629,14 @@ const sfx={
             setTimeout(()=>beep(60,.7,'sine',.12,-20),60);},
   warn:()=>{[440,440].forEach((f,i)=>setTimeout(()=>beep(f,.16,'square',.06),i*220));},
   win:()=>{[523,659,784,1047,1319].forEach((f,i)=>setTimeout(()=>beep(f,.22,'triangle',.09),i*110));},
-  lose:()=>{[400,340,280,200].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sine',.075),i*170));}
+  lose:()=>{[400,340,280,200].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sine',.075),i*170));},
+  /* v0.3 silly noises */
+  beepboop:()=>{[880,660,1046].forEach((f,i)=>setTimeout(()=>beep(f,.06,'square',.05),i*70));},
+  bonk:()=>{beep(250,.11,'triangle',.09,-130); setTimeout(()=>beep(150,.18,'sine',.08,-60),70);},
+  wrongo:()=>{[320,250,190,130].forEach((f,i)=>setTimeout(()=>beep(f,.22,'sawtooth',.09,-70),i*95));},
+  buzz:()=>beep(150,.16,'sawtooth',.05,30),
+  zap:()=>{beep(1600,.09,'sawtooth',.07,-1200); setTimeout(()=>beep(120,.22,'sawtooth',.08,-60),50);},
+  rip:()=>{beep(420,.22,'sawtooth',.08,-300); setTimeout(()=>beep(180,.3,'square',.07,-110),110);}
 };
 
 /* ============ seasonal chiptune ============ */
@@ -662,6 +746,22 @@ const reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
 
 /* ================= canvas ================= */
 const cv=$('game'), g=cv.getContext('2d');
+/* Safari only grew ctx.roundRect in 16.4. On an older iPad the boss art would throw
+   every single frame. Fill it in when it is missing so nothing depends on it. */
+try{
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+      var k=(typeof r==='number')?r:(r&&r.length?r[0]:0);
+      k=Math.min(k,Math.abs(w)/2,Math.abs(h)/2);
+      this.moveTo(x+k,y);
+      this.lineTo(x+w-k,y); this.quadraticCurveTo(x+w,y,x+w,y+k);
+      this.lineTo(x+w,y+h-k); this.quadraticCurveTo(x+w,y+h,x+w-k,y+h);
+      this.lineTo(x+k,y+h); this.quadraticCurveTo(x,y+h,x,y+h-k);
+      this.lineTo(x,y+k); this.quadraticCurveTo(x,y,x+k,y);
+      return this;
+    };
+  }
+}catch(_){}
 let W=0,H=0,DPR=1;
 function resize(){
   DPR=Math.min(devicePixelRatio||1,2.5);
@@ -718,6 +818,27 @@ const FACTS=[
  'Mars has seasons, polar ice caps, and dust storms that swallow the entire planet.'
 ];
 
+/* ================= comic-book noises ================= */
+const BOOMS=['KA-BLAMMO!','KER-SPLAT!','WHAM-O-RAMA!','BA-DOOSH!','SPLORT!','THWOMP!',
+             'KA-POW!','BOINK-A-DOINK!','WRECKED!','FWOOMP!'];
+const SMALLBOOMS=['BONK!','OOF!','SPLAT!','POP!','DOINK!','BLORP!'];
+
+/* ================= jokes (the other curiosity payload) ================= */
+const JOKES=[
+ 'What do you call a fly with no wings? A walk.',
+ 'Why do gym socks make terrible spies? They always get sniffed out.',
+ 'How does a space octopus laugh? TEN-TACKLES.',
+ 'What is a calculator\'s favourite snack? Number crunchies.',
+ 'Why was the math book smiling? Somebody finally solved all its problems.',
+ 'What do you call a pile of laundry left in space? A stinkhole.',
+ 'Why did the pencil lose the race? It kept getting the point.',
+ 'Knock knock. Who is there? Boo. Boo who? Do not cry, it is only wave 12.',
+ 'What is a monster\'s favourite dessert? I-scream.',
+ 'Why did the fly land on the clock? It was killing time.',
+ 'What do you get if you cross a lunch lady with a rain cloud? Soup. Everywhere. Just soup.',
+ 'Why did the astronaut bring a broom? To sweep up the stardust. It did not work.'
+];
+
 /* ================= game state ================= */
 let T,tKey,bossImg=null,bossReady=false;
 let P=null, bullets=[], foes=[], ebul=[], drops=[], parts=[], stars=[];
@@ -725,6 +846,33 @@ let waveAge=0;
 let boss=null, wave=1, score=0, combo=0, mult=1, od=0, lives=3, tier=1, shield=0, shieldMax=1;
 let spawnQ=[], spawnT=0, state='menu', shake=0, flashT=0, last=0, runKills=0, waveClearT=0;
 let bossPending=0;
+/* v0.3 math extras: calculators as the hazard, and floating answer bubbles */
+let calcMode=false, answers=[], quizQ='';
+/* v0.3 the ship has a hull now. Shields still eat a whole hit; when the hull runs
+   out you lose a SHIP, not before. That is four or five mistakes per ship instead
+   of one, which is what pays for the new hazards below. */
+/* ============================================================================
+   THE TINKER DECK KNOBS
+   These are ordinary global variables. The game reads them every single frame --
+   nothing is faked and nothing is copied. When a kid taps + in the Tinker Deck it
+   writes to the variable right here, and the very next frame behaves differently.
+   `var` on purpose: it puts them on `window`, which is how the Deck finds them
+   by name instead of needing a giant switch statement.
+   ========================================================================== */
+var MAGNET_RADIUS = 105;   // how close a pickup has to be before it flies to you
+var MAGNET_PULL   = 185;   // how fast it flies at you, in pixels per second
+var FIRE_RATE     = 1;     // bigger = the gun goes off more often
+var SHOT_SPREAD   = 1;     // how wide the shots fan out
+var SHIELD_BONUS  = 0;     // extra shield layers on every S pickup
+var HULL_MAX      = 100;   // how much one ship can take before it is lost
+var SHIP_SPEED    = 13;    // how snappily the ship chases your finger
+var ENEMY_SPEED   = 1;     // speed of everything trying to squash you
+var BOSS_HP       = 1;     // how chunky the bosses are
+var DEBRIS_ON     = 1;     // do bosses shed dangerous bits when you hurt them
+var NEXT_BOSS     = -1;    // -1 = take turns; 0..4 = always this one
+
+let hull=HULL_MAX, hitFlash=0, debris=[];
+const HITWORDS=['OOF!','BONK!','OW!','CLANG!','THUNK!','YEOWCH!','KA-DONK!','WHUMP!'];
 
 const TIERS=[
   {n:'Cannon',r:'I',  cd:0.165,dmg:1},    /*  6 dps */
@@ -863,6 +1011,26 @@ function drawShip(p,dt){
   g.restore(); g.globalAlpha=1;
 }
 
+/* ================= a grumpy pocket calculator =================
+   Drawn by hand instead of using an emoji: there is no calculator emoji that is
+   safe across devices, and a tofu box is not funny. Size s = width in px. */
+function drawCalc(x,y,s){
+  const w=s, h=s*1.2;
+  g.save(); g.translate(x,y);
+  g.fillStyle='#cfd8e8'; g.strokeStyle='#5a6a86'; g.lineWidth=Math.max(1.5,s*0.06);
+  g.beginPath(); g.roundRect(-w/2,-h/2,w,h,s*0.18); g.fill(); g.stroke();
+  g.fillStyle='#12301f';
+  g.beginPath(); g.roundRect(-w*0.36,-h*0.41,w*0.72,h*0.27,s*0.06); g.fill();
+  g.fillStyle='#7bffb0';                                   // two cross little eyes
+  g.beginPath(); g.arc(-w*0.13,-h*0.28,s*0.06,0,6.283); g.arc(w*0.13,-h*0.28,s*0.06,0,6.283); g.fill();
+  g.fillStyle='#8f9fb8';                                   // buttons
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+    g.beginPath(); g.arc((c-1)*w*0.25, h*0.03+r*h*0.185, s*0.072,0,6.283); g.fill(); }
+  g.fillStyle='#e8a13c';
+  g.beginPath(); g.arc(w*0.25, h*0.03, s*0.072,0,6.283); g.fill();
+  g.restore();
+}
+
 /* ================= enemies ================= */
 const FOE={
   drifter:{hp:1, r:15, sc:10, spd:74,  size:27, cost:1},
@@ -878,14 +1046,15 @@ const FOE={
 /* Everything gets a nudge tougher and quicker as the waves climb. Gentle on purpose:
    about +4% health and +2% speed per wave, capped, so wave 20 is a real step up from
    wave 5 without turning into a wall. */
-function foeScale(){ return {hp:1+Math.min(1.6,wave*0.04), spd:1+Math.min(0.55,wave*0.02)}; }
+function foeScale(){ return {hp:1+Math.min(1.6,wave*0.04),
+                             spd:(1+Math.min(0.55,wave*0.02))*ENEMY_SPEED}; }
 function spawnFoe(type,x){
   const SC=foeScale();
   const d=FOE[type];
   const hp=Math.max(1,Math.round(d.hp*SC.hp));
   foes.push({type,x,y:-40,r:d.r,hp,max:hp,sc:Math.round(d.sc*SC.hp),size:d.size,spdMul:SC.spd,
     bx:x, ph:Math.random()*6.283, t:0, st:d.shoot?rnd(0.6,d.shoot):0, mini:!!d.mini,
-    glyph:pick(T.ammo), hit:0, held:false});
+    glyph:pick(T.ammo), sprite:(calcMode?'calc':null), hit:0, held:false});
 }
 function updateFoes(dt){
   for(let i=foes.length-1;i>=0;i--){
@@ -942,9 +1111,14 @@ function drawFoes(){
     g.scale(s,s);
     if(f.hit>0){ g.shadowColor='#fff'; g.shadowBlur=22; }
     else { g.shadowColor=T.accent2; g.shadowBlur=11; }
-    g.font=f.size+'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",serif';
-    g.textAlign='center'; g.textBaseline='middle';
-    g.fillText(f.glyph,0,0);
+    if(f.sprite==='calc'){
+      g.rotate(Math.sin(f.t*3.1+f.ph)*0.24);
+      drawCalc(0,0,f.size*0.86);
+    } else {
+      g.font=f.size+'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",serif';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillText(f.glyph,0,0);
+    }
     g.restore(); g.shadowBlur=0;
     if(f.max>2){
       const w=f.size*0.9, hp=clamp(f.hp/f.max,0,1);
@@ -958,6 +1132,7 @@ function killFoe(f,i){
   burst(f.x,f.y,Math.min(24,10+f.size/3),T.glow,230,0.6);
   burst(f.x,f.y,6,'#fff',150,0.3);
   sfx.boom(); shake=Math.min(shake+3.5,11);
+  if(f.mini){ banner(pick(SMALLBOOMS)); sfx.bonk(); }
   addScore(f.sc); combo++; runKills++; bumpCombo();
   od=Math.min(100,od+(f.max>2?7:3.2));
   rollDrop(f.x,f.y,f.max);
@@ -967,20 +1142,28 @@ function killFoe(f,i){
 <script>
 "use strict";
 /* ================= drops ================= */
-const DROP={w:{c:'#43e8ff',t:'W'},s:{c:'#5fe39a',t:'S'},star:{c:'#ffc46b',t:'*'},life:{c:'#ff4d6d',t:'+'}};
+const DROP={w:{c:'#43e8ff',t:'W'},s:{c:'#5fe39a',t:'S'},star:{c:'#ffc46b',t:'*'},
+            life:{c:'#ff4d6d',t:'+'},rep:{c:'#9be36f',t:'H'}};
 function rollDrop(x,y,tough){
   const r=Math.random();
   let k=null;
-  if(tough>2){ if(r<0.26) k='w'; else if(r<0.44) k='s'; else if(r<0.82) k='star'; else if(r<0.835) k='life'; }
-  else { if(r<0.038) k='w'; else if(r<0.075) k='s'; else if(r<0.22) k='star'; }
+  /* v0.3: H repairs the hull. It shows up more often when you actually need it. */
+  const hurtBonus = hull<HULL_MAX*0.6 ? 0.10 : 0;
+  if(tough>2){ if(r<0.24) k='w'; else if(r<0.40) k='s'; else if(r<0.54+hurtBonus) k='rep';
+               else if(r<0.86) k='star'; else if(r<0.875) k='life'; }
+  else { if(r<0.036) k='w'; else if(r<0.070) k='s'; else if(r<0.125+hurtBonus) k='rep';
+         else if(r<0.26) k='star'; }
   if(k) drops.push({x,y,k,vy:74,t:0,r:15});
 }
 function updateDrops(dt){
   for(let i=drops.length-1;i>=0;i--){
     const d=drops[i]; d.t+=dt; d.y+=d.vy*dt; d.x+=Math.sin(d.t*2.6)*26*dt;
-    /* gentle magnet so a near miss still counts */
+    /* ---- THE MAGNET ----  (Tinker Deck explainer #1 quotes these five lines) */
     const dx=P.x-d.x, dy=P.y-d.y, dist=Math.hypot(dx,dy);
-    if(dist<105){ d.x+=dx/dist*185*dt; d.y+=dy/dist*185*dt; }
+    if(dist<MAGNET_RADIUS){
+      d.x += dx/dist * MAGNET_PULL * dt;
+      d.y += dy/dist * MAGNET_PULL * dt;
+    }
     if(dist<d.r+P.r+9){ takeDrop(d); drops.splice(i,1); continue; }
     if(d.y>H+30) drops.splice(i,1);
   }
@@ -1003,9 +1186,16 @@ function takeDrop(d){
   if(d.k==='w'){
     if(tier<4){ tier++; sfx.power(); banner('WEAPON UP'); } else { addScore(250); sfx.pick(); }
     updHUD();
-  } else if(d.k==='s'){ shield=shieldMax; sfx.power(); if(shieldMax>1) banner('SHIELD x'+shieldMax); }
+  } else if(d.k==='s'){ shield=shieldMax+SHIELD_BONUS; sfx.power();
+    banner(shield>1?('SHIELD x'+shield):'SHIELD UP'); }
+  else if(d.k==='rep'){
+    if(hull>=HULL_MAX){ addScore(90); sfx.pick(); }
+    else { hull=Math.min(HULL_MAX,hull+45); sfx.power(); banner('PATCHED UP!'); bumpHull(); }
+    updHUD();
+  }
   else if(d.k==='star'){ addScore(60); od=Math.min(100,od+9); sfx.pick(); }
-  else if(d.k==='life'){ lives=Math.min(4,lives+1); sfx.power(); banner('EXTRA LIFE'); updHUD(); }
+  else if(d.k==='life'){ lives=Math.min(4,lives+1); hull=HULL_MAX; sfx.power();
+    banner('EXTRA SHIP!'); updHUD(); }
   burst(d.x,d.y,10,DROP[d.k].c,170,0.4);
 }
 
@@ -1017,12 +1207,12 @@ function shoot(){
   if(G.id==='cannon'){
     if(tier===1) mk(P.x,0,-620);
     else if(tier===2){ mk(P.x-8,0,-640); mk(P.x+8,0,-640); }
-    else if(tier===3){ mk(P.x,0,-660); mk(P.x-7,-165,-620); mk(P.x+7,165,-620); }
-    else { mk(P.x,0,-700); mk(P.x-9,-90,-680); mk(P.x+9,90,-680); }
+    else if(tier===3){ mk(P.x,0,-660); mk(P.x-7,-165*SHOT_SPREAD,-620); mk(P.x+7,165*SHOT_SPREAD,-620); }
+    else { mk(P.x,0,-700); mk(P.x-9,-90*SHOT_SPREAD,-680); mk(P.x+9,90*SHOT_SPREAD,-680); }
     sfx.shot();
   } else if(G.id==='scatter'){
     const n=3+2*(tier-1);                              // ALWAYS ODD: there must be a centre shot
-    for(let i=0;i<n;i++){ const a=-Math.PI/2+(i-(n-1)/2)*0.10;
+    for(let i=0;i<n;i++){ const a=-Math.PI/2+(i-(n-1)/2)*0.10*SHOT_SPREAD;
       mk(P.x,Math.cos(a)*540,Math.sin(a)*540); }
     sfx.shot();
   } else if(G.id==='lance'){
@@ -1050,6 +1240,12 @@ function drawBullets(){
     g.restore(); g.shadowBlur=0;
   }
   for(const b of ebul){
+    if(b.calc){
+      g.save(); g.translate(b.x,b.y); g.rotate(b.rot||0);
+      g.shadowColor='#ffd24a'; g.shadowBlur=12;
+      drawCalc(0,0,26);
+      g.restore(); g.shadowBlur=0; continue;
+    }
     g.save(); g.translate(b.x,b.y);
     g.shadowColor='#ff4d6d'; g.shadowBlur=13;
     g.fillStyle='#ffd0da';
@@ -1064,22 +1260,37 @@ function drawBullets(){
 /* ===== v0.2 BOSS ROSTER =====
    Four bosses on a rotation, drawn on the canvas so no artwork has to load.
    Each has its own attack set and they get meaner as the waves climb.
-   Wave 5 octopus -> 10 zombie cop -> 15 the seasonal boss (original art) -> 20 the Professor. */
+   Wave 5 octopus -> 10 zombie cop -> 15 the lunchlady -> 20 the seasonal monster
+   -> 25 the Professor. Same five, same order as v0.2. */
 let bolts=[];                                   // telegraphed lightning columns
 
 function bossFor(w){
+  /* THE BOSS LIST. The game does not know any boss by name -- it just reads this
+     array in order. Add one to the list and it joins the rotation. */
+  if(NEXT_BOSS>=0 && NEXT_BOSS<ROSTER.length) return ROSTER[NEXT_BOSS];
   const n=Math.floor(w/5);                      // 1,2,3,4,5...
-  return [OCTO,COP,LUNCH,THEMEBOSS,PROF][(n-1)%5];
+  return ROSTER[(n-1)%ROSTER.length];
 }
 
 const OCTO={
-  id:'octo', name:'Zap, the Electric Space Octopus', hpMul:1.0, tint:'#7cf0ff',
+  id:'octo', name:'Zap, the Electric Space Octopus', hpMul:1.0, tint:'#7cf0ff', hitR:98,
   draw(b){
     const t=b.t, mad=b.phase>=3;
     g.shadowBlur=0;
     // ---- eight tentacles, tapered, curling, with suckers ----
+    // v0.3: as he takes damage they come OFF, in this order, and the stump shows.
+    const GONE=[7,0,4];
     for(let i=0;i<8;i++){
+      const lost=GONE.indexOf(i)>=0 && GONE.indexOf(i)<(b.broken||0);
       const base=-1.15+i*0.33, curl=Math.sin(t*2.6+i*0.85)*0.6;
+      if(lost){                                  // a sad little ragged stump
+        g.save(); g.rotate(base);
+        g.strokeStyle='#6d3fd6'; g.lineCap='round'; g.lineWidth=17;
+        g.beginPath(); g.moveTo(0,30); g.lineTo(0,44); g.stroke();
+        g.fillStyle='#9be36f';
+        g.beginPath(); g.arc(0,46,7+Math.sin(t*6+i)*1.5,0,6.283); g.fill();
+        g.restore(); continue;
+      }
       g.save(); g.rotate(base);
       g.lineCap='round';
       let px=0, py=30;
@@ -1155,9 +1366,8 @@ const OCTO={
   },
   fire(b,aim){
     if(b.phase>=2 && Math.random()<0.55){        // lightning columns: warn, then strike
-      const n=b.phase===3?3:2;
-      for(let i=0;i<n;i++) bolts.push({x:rnd(20,W-20), warn:0.85, live:0, w:36});
-      banner('LIGHTNING'); sfx.warn(); return;
+      strike(b.phase===3?3:2, 0.85, 36);
+      banner('LIGHTNING! MOVE!'); sfx.warn(); return;
     }
     const n=b.phase===3?14:10;
     for(let i=0;i<n;i++){ const a=i/n*6.283+b.t;
@@ -1167,23 +1377,34 @@ const OCTO={
 };
 
 const COP={
-  id:'cop', name:'Officer Grumbles, Zombie School Cop', hpMul:1.25, tint:'#7bdc7b',
+  id:'cop', name:'Officer Grumbles, Zombie School Cop', hpMul:1.25, tint:'#7bdc7b', hitR:76,
   draw(b){
     const t=b.t;
     g.fillStyle='#2b3a6b'; g.strokeStyle='#16224a'; g.lineWidth=4;   // body
     g.beginPath(); g.roundRect(-46,6,92,66,14); g.fill(); g.stroke();
     g.fillStyle='#7bdc7b';                                            // head
     g.beginPath(); g.arc(0,-26,40,0,6.283); g.fill(); g.stroke();
+    const br=b.broken||0;
+    g.save(); g.rotate(br*0.13);                                      // v0.3: hat slides off
     g.fillStyle='#1d2a55';                                            // hat
     g.beginPath(); g.roundRect(-44,-70,88,24,8); g.fill(); g.stroke();
     g.beginPath(); g.roundRect(-52,-50,104,12,6); g.fill(); g.stroke();
-    g.fillStyle='#ffd24a'; g.beginPath();                             // badge
-    for(let i=0;i<5;i++){ const a=-Math.PI/2+i*1.2566;
-      g.lineTo(Math.cos(a)*11,-60+Math.sin(a)*11); g.lineTo(Math.cos(a+0.63)*5,-60+Math.sin(a+0.63)*5); }
-    g.closePath(); g.fill();
+    if(br<2){ g.fillStyle='#ffd24a'; g.beginPath();                   // badge (falls off at 2)
+      for(let i=0;i<5;i++){ const a=-Math.PI/2+i*1.2566;
+        g.lineTo(Math.cos(a)*11,-60+Math.sin(a)*11); g.lineTo(Math.cos(a+0.63)*5,-60+Math.sin(a+0.63)*5); }
+      g.closePath(); g.fill(); }
+    g.restore();
     g.fillStyle='#fff'; g.beginPath(); g.arc(-14,-28,11,0,6.283); g.arc(14,-28,11,0,6.283); g.fill();
     g.fillStyle='#c22'; g.beginPath();
     g.arc(-14+Math.sin(t*2)*3,-28,5,0,6.283); g.arc(14+Math.sin(t*2)*3,-28,5,0,6.283); g.fill();
+    if(br>=3){                                                        // one eye goes swirly
+      g.strokeStyle='#c22'; g.lineWidth=2.4; g.beginPath();
+      for(let k=0;k<26;k++){ const a=k*0.42, rr=k*0.36;
+        g.lineTo(-14+Math.cos(a+t*6)*rr,-28+Math.sin(a+t*6)*rr); }
+      g.stroke();
+    }
+    if(br>=1){ g.fillStyle='#f0d9a8'; g.save(); g.rotate(0.5);        // a plaster on the chin
+      g.fillRect(-6,4,26,9); g.restore(); }
     g.strokeStyle='#0b0f22'; g.lineWidth=3;                            // grumpy mouth
     g.beginPath(); g.arc(0,-4,16,3.6,5.8); g.stroke();
   },
@@ -1203,21 +1424,30 @@ const COP={
 };
 
 const LUNCH={
-  id:'lunch', name:'Lunchlady Gorgonzola', hpMul:1.4, tint:'#a7e05a',
+  id:'lunch', name:'Lunchlady Gorgonzola', hpMul:1.4, tint:'#a7e05a', hitR:78,
   draw(b){
     const t=b.t;
     g.fillStyle='#e9eef7'; g.strokeStyle='#9aa6bd'; g.lineWidth=4;        // apron
     g.beginPath(); g.roundRect(-50,2,100,72,14); g.fill(); g.stroke();
     g.fillStyle='#f2c9a0'; g.beginPath(); g.arc(0,-28,38,0,6.283); g.fill(); g.stroke();
+    const br=b.broken||0;
+    if(br>=2){ g.fillStyle='#a7e05a'; g.globalAlpha=.8;                    // soup down the apron
+      g.beginPath(); g.ellipse(-12,34,17,22,0.2,0,6.283); g.fill();
+      g.beginPath(); g.ellipse(16,50,11,15,-0.2,0,6.283); g.fill(); g.globalAlpha=1;
+      g.fillStyle='#e9eef7'; g.strokeStyle='#9aa6bd'; }
+    g.save(); g.rotate(br*0.16);                                           // hairnet slides off
     g.fillStyle='#fff'; g.beginPath();                                     // hairnet puff
     g.ellipse(0,-58,44,22,0,0,6.283); g.fill(); g.stroke();
+    g.restore();
     g.strokeStyle='#c8d0e0'; g.lineWidth=1.5;
     for(let i=-4;i<=4;i++){ g.beginPath(); g.moveTo(i*9,-72); g.lineTo(i*7,-44); g.stroke(); }
     g.fillStyle='#0b0f22'; g.strokeStyle='#0b0f22'; g.lineWidth=3;
     g.beginPath(); g.arc(-14,-30,4,0,6.283); g.arc(14,-30,4,0,6.283); g.fill();
     g.beginPath(); g.arc(0,-10,14,0.4,2.7); g.stroke();                    // unimpressed
-    g.save(); g.rotate(Math.sin(t*2.4)*0.5); g.translate(52,10);           // ladle
-    g.strokeStyle='#b8c2d4'; g.lineWidth=7; g.beginPath(); g.moveTo(0,-26); g.lineTo(0,10); g.stroke();
+    g.save(); g.rotate(Math.sin(t*2.4)*0.5+(br>=3?0.7:0)); g.translate(52,10);  // ladle (bent at 3)
+    g.strokeStyle='#b8c2d4'; g.lineWidth=7; g.beginPath(); g.moveTo(0,-26);
+    if(br>=3) g.quadraticCurveTo(9,-8,0,10); else g.lineTo(0,10);
+    g.stroke();
     g.fillStyle='#b8c2d4'; g.beginPath(); g.arc(0,16,13,0,6.283); g.fill();
     g.fillStyle='#a7e05a'; g.beginPath(); g.arc(0,14,9,0,6.283); g.fill();
     g.restore();
@@ -1236,42 +1466,208 @@ const LUNCH={
 };
 
 const PROF={
-  id:'prof', name:'Professor Von Homework', hpMul:1.6, tint:'#ff7a5c',
+  id:'prof', name:'Professor Von Homework', hpMul:1.6, tint:'#ff7a5c', hitR:80,
   draw(b){
-    const t=b.t;
+    const t=b.t, mad=b.phase>=3, dizzy=b.stun>0;
+    g.save();
+    g.rotate(dizzy ? Math.sin(t*16)*0.30 : Math.sin(t*2.6)*0.05);   // v0.3: he WOBBLES
+    g.textAlign='center'; g.textBaseline='middle'; g.lineJoin='round';
     g.fillStyle='#233047'; g.strokeStyle='#121a2c'; g.lineWidth=4;
     g.beginPath(); g.roundRect(-52,4,104,72,12); g.fill(); g.stroke();
+    /* v0.3: a calculator in the breast pocket, obviously */
+    g.save(); g.translate(-30,34); g.rotate(-0.22); drawCalc(0,0,20); g.restore();
     g.fillStyle='#f2d3a8'; g.beginPath(); g.arc(0,-28,38,0,6.283); g.fill(); g.stroke();
+    const br=b.broken||0;
+    g.save(); g.rotate(br*0.11);                                      // v0.3: cap slides off
     g.fillStyle='#1b2436';                                            // mortarboard
     g.beginPath(); g.moveTo(-56,-58); g.lineTo(56,-58); g.lineTo(34,-46); g.lineTo(-34,-46);
     g.closePath(); g.fill(); g.stroke();
-    g.strokeStyle='#ffd24a'; g.lineWidth=3; g.beginPath();
-    g.moveTo(46,-58); g.quadraticCurveTo(60,-40+Math.sin(t*3)*6,52,-22); g.stroke();
+    if(br<3){ g.strokeStyle='#ffd24a'; g.lineWidth=3; g.beginPath();  // tassel (gone at 3)
+      g.moveTo(46,-58); g.quadraticCurveTo(60,-40+Math.sin(t*3)*6,52,-22); g.stroke(); }
+    g.restore();
+    /* v0.3 GOOGLY EYES behind the spectacles. They jiggle on their own and the two
+       of them never quite agree with each other. */
+    for(let i=0;i<2;i++){
+      const sx=i?15:-15;
+      g.fillStyle='#fff'; g.strokeStyle='#121a2c'; g.lineWidth=3;
+      g.beginPath(); g.arc(sx,-30,12,0,6.283); g.fill(); g.stroke();
+      let px,py;
+      if(dizzy){ px=Math.cos(t*13+i*2.1)*5.5; py=Math.sin(t*13+i*2.1)*5.5; }
+      else { px=clamp((P.x-b.x)/17,-5,5)+Math.sin(t*7+i*3)*2.2;
+             py=clamp((P.y-b.y)/42,-4,4)+Math.cos(t*8.3+i*2)*2.2; }
+      g.fillStyle='#121a2c';
+      g.beginPath(); g.arc(sx+px,-30+py,5,0,6.283); g.fill();
+      g.fillStyle='rgba(255,255,255,.9)';
+      g.beginPath(); g.arc(sx+px-2,-32+py,1.9,0,6.283); g.fill();
+    }
     g.strokeStyle='#121a2c'; g.lineWidth=4;                            // spectacles
-    g.beginPath(); g.arc(-15,-30,13,0,6.283); g.arc(15,-30,13,0,6.283); g.moveTo(-2,-30); g.lineTo(2,-30); g.stroke();
-    g.fillStyle='#c22'; g.beginPath(); g.arc(-15,-30,5,0,6.283); g.arc(15,-30,5,0,6.283); g.fill();
-    g.strokeStyle='#0b0f22'; g.beginPath(); g.arc(0,-2,15,3.5,5.9); g.stroke();
-    g.font='bold 20px ui-monospace,monospace'; g.fillStyle='#ff7a5c'; g.textAlign='center';
-    g.fillText(['x\u00b2','\u03c0r\u00b2','7\u00d78','\u221a49'][Math.floor(t*1.4)%4],0,58);
+    g.beginPath(); g.arc(-15,-30,13,0,6.283); g.arc(15,-30,13,0,6.283);
+    g.moveTo(-2,-30); g.lineTo(2,-30); g.stroke();
+    if(br>=2){ g.strokeStyle='#dbe4f7'; g.lineWidth=2;                 // a cracked lens
+      g.beginPath(); g.moveTo(-24,-36); g.lineTo(-14,-29); g.lineTo(-20,-22);
+      g.moveTo(-14,-29); g.lineTo(-5,-34); g.stroke(); }
+    g.strokeStyle='#0b0f22'; g.lineWidth=3.5; g.lineCap='round';       // mouth
+    g.beginPath();
+    if(dizzy) g.arc(0,4,12,3.45,5.98);
+    else if(mad){ g.moveTo(-13,-2); g.quadraticCurveTo(0,16,13,-2); }
+    else g.arc(0,-2,15,3.5,5.9);
+    g.stroke();
+    /* v0.3: a stick of chalk he waves like a wand */
+    g.strokeStyle='#233047'; g.lineWidth=12; g.lineCap='round';
+    g.beginPath(); g.moveTo(40,20); g.lineTo(62,10+Math.cos(t*3)*7); g.stroke();
+    g.save(); g.translate(64,10+Math.cos(t*3)*7); g.rotate(-0.5+Math.sin(t*2.3)*0.3);
+      g.fillStyle='#fdf6e3'; g.strokeStyle='#c9c0a8'; g.lineWidth=2;
+      g.beginPath(); g.roundRect(-4.5,-26,9,32,3); g.fill(); g.stroke();
+      if(!dizzy){ g.fillStyle='#fff'; g.globalAlpha=.55;
+        for(let i=0;i<3;i++){ g.beginPath();
+          g.arc(rnd(-7,7),-30-rnd(0,10),rnd(1,2.6),0,6.283); g.fill(); }
+        g.globalAlpha=1; }
+    g.restore();
+    g.restore();
+    /* the long-division ticker he has always had, now orbiting his head */
+    g.textAlign='center'; g.textBaseline='middle';
+    g.font='bold 15px ui-monospace,monospace';
+    g.fillStyle=dizzy?'#ff9db0':'#ff7a5c';
+    const eqs=dizzy?['?','!?','??','?!','?','!!']
+                   :['8\u00f72','\u00f7','42\u00f76','\u00f7','9\u00f73','\u00f7'];
+    for(let i=0;i<6;i++){
+      const a=t*(dizzy?4.5:1.2)+i*1.047, rr=92+Math.sin(t*2+i)*8;
+      g.fillText(eqs[i], Math.cos(a)*rr, Math.sin(a)*rr*0.55-18);
+    }
+    if(dizzy){
+      g.font='800 13px "Fredoka",system-ui,sans-serif'; g.fillStyle='#fff';
+      g.fillText('DOES NOT COMPUTE!!',0,-124);
+    }
+    g.textAlign='left'; g.textBaseline='alphabetic'; g.lineCap='butt';
   },
   fire(b,aim){
-    if(b.phase>=2 && Math.random()<0.4){          // pop quiz: lightning + adds together
-      for(let i=0;i<2;i++) bolts.push({x:rnd(20,W-20), warn:0.7, live:0, w:40});
-      spawnFoe('turret',rnd(60,W-60));
-      banner('POP QUIZ'); sfx.warn(); return;
+    const calcShot=(x,y,vx,vy)=>ebul.push({x,y,vx,vy,r:9,calc:1,spin:rnd(-4,4),rot:rnd(0,6)});
+    if(answers.length){                            // busy marking; only a light poke
+      calcShot(b.x,b.y+10,Math.cos(aim)*150,Math.sin(aim)*150);
+      sfx.buzz(); return;
     }
-    const n=b.phase===3?20:14;                    // homework spiral
-    for(let i=0;i<n;i++){ const a=i/n*6.283+b.t*2.1;
-      ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*(185+b.phase*25),vy:Math.sin(a)*(185+b.phase*25),r:6}); }
-    if(b.phase===3) for(let k=-1;k<=1;k++)
-      ebul.push({x:b.x,y:b.y,vx:Math.cos(aim+k*0.14)*300,vy:Math.sin(aim+k*0.14)*300,r:8});
-    sfx.pop();
+    if(Math.random()<0.40){ popQuiz(); return; }    // v0.3: POP QUIZ is a real quiz now
+    if(b.phase>=2 && Math.random()<0.38){           // CALCULATOR STAMPEDE
+      const n=b.phase===3?7:5;
+      for(let i=0;i<n;i++)
+        calcShot(rnd(30,Math.max(31,W-30)),-26,rnd(-26,26),rnd(150,215));
+      banner('CALCULATOR STAMPEDE!'); sfx.beepboop(); return;
+    }
+    if(b.phase>=2 && Math.random()<0.34){           // the v0.2 surprise-homework attack
+      strike(2, 0.7, 40);
+      spawnFoe('turret',rnd(60,Math.max(61,W-60)));
+      banner('SURPRISE HOMEWORK!'); sfx.warn(); return;
+    }
+    const n=b.phase===3?7:5;                        // a volley of long division
+    for(let k=0;k<n;k++){ const a=aim+(k-(n-1)/2)*0.20, sp=175+b.phase*22;
+      calcShot(b.x,b.y+10,Math.cos(a)*sp,Math.sin(a)*sp); }
+    if(b.phase===3){                                // the v0.2 homework spiral, kept
+      for(let i=0;i<16;i++){ const a=i/16*6.283+b.t*2.1;
+        ebul.push({x:b.x,y:b.y,vx:Math.cos(a)*235,vy:Math.sin(a)*235,r:6}); }
+    }
+    sfx.beepboop();
   }
 };
 
+/* ============================================================================
+   v0.3 -- THE PROFESSOR'S POP QUIZ
+   Professor Von Homework already had a POP QUIZ attack in v0.2; in v0.3 it is an
+   actual quiz. He is not mean about maths -- he LOVES it, unbearably, and that is
+   the whole joke. He fires long division, he flings calculators, and the one thing
+   that can hurt him is an answer so silly his brain gives up.
+   ========================================================================== */
+const QUIZ=[
+  {q:'144 \u00f7 12', a:'12', silly:['A BURRITO','12 SOCKS','ORANGE']},
+  {q:'96 \u00f7 8',   a:'12', silly:['A BURP','BANANA','SIX CATS']},
+  {q:'81 \u00f7 9',   a:'9',  silly:['ELEVENTY','A SANDWICH','PURPLE']},
+  {q:'150 \u00f7 5',  a:'30', silly:['A LOT','LOTS OF FLIES','SPAGHETTI']},
+  {q:'72 \u00f7 6',   a:'12', silly:['FISH','A HUNDRED DOGS','WEDNESDAY']},
+  {q:'63 \u00f7 7',   a:'9',  silly:['NINE PICKLES','A SNEEZE','TOAST']},
+  {q:'100 \u00f7 4',  a:'25', silly:['CHEESE','A BIG ONE','25 FEET']},
+  {q:'56 \u00f7 8',   a:'7',  silly:['GRAPES','BLUE','ONE PIZZA']},
+  {q:'132 \u00f7 11', a:'12', silly:['A GYM SOCK','MOOSE','TWELVETY']},
+  {q:'45 \u00f7 5',   a:'9',  silly:['NINE? NO. SOUP.','HONK','A LITTLE GUY']}
+];
+
+/* where the answer bubbles sit: below the boss, above the ship, on any screen */
+function quizBase(){ return clamp(H*0.44, 200, Math.max(210,H-215)); }
+function ansFont(){ return '700 '+Math.max(12,Math.min(18,Math.round(W/23)))+'px "Fredoka",system-ui,sans-serif'; }
+
+function popQuiz(){
+  const Q=pick(QUIZ);
+  const near=String(Math.max(1,(+Q.a)+pick([1,-1,2,-2,3])));
+  const opts=[{t:Q.a,k:'right'},{t:near,k:'near'},{t:pick(Q.silly),k:'silly'}];
+  for(let i=opts.length-1;i>0;i--){                       // shuffle the rows
+    const j=Math.floor(Math.random()*(i+1)), tmp=opts[i]; opts[i]=opts[j]; opts[j]=tmp; }
+  answers=[]; quizQ=Q.q+' = ?';
+  const base=quizBase();
+  g.font=ansFont();
+  for(let i=0;i<opts.length;i++){
+    const w=Math.min(W-26, Math.max(70, g.measureText(opts[i].t).width+34));
+    answers.push({x:clamp(rnd(w/2+10,W-w/2-10),w/2+10,Math.max(w/2+10,W-w/2-10)),
+                  y:base+i*54, w:w, h:38, vx:(i%2?1:-1)*rnd(30,60),
+                  t:0, life:11.5, txt:opts[i].t, k:opts[i].k});
+  }
+  if(boss) boss.atk=3.4;
+  banner('POP QUIZ!!'); sfx.warn();
+}
+function updAnswers(dt){
+  if(!answers.length) return;
+  for(let i=answers.length-1;i>=0;i--){
+    const a=answers[i]; a.t+=dt; a.life-=dt; a.x+=a.vx*dt;
+    if(a.x-a.w/2<8){ a.x=8+a.w/2; a.vx=Math.abs(a.vx); }
+    if(a.x+a.w/2>W-8){ a.x=W-8-a.w/2; a.vx=-Math.abs(a.vx); }
+    if(a.life<=0) answers.splice(i,1);
+  }
+  if(!answers.length && quizQ){ quizQ=''; banner('NOBODY ANSWERED!'); }
+}
+function drawAnswers(){
+  if(!answers.length) return;
+  g.textAlign='center'; g.textBaseline='middle';
+  if(quizQ){                                             // the question, on its own pill
+    const base=quizBase();
+    g.font='800 '+Math.max(17,Math.min(27,Math.round(W/14)))+'px "Fredoka",system-ui,sans-serif';
+    const qw=Math.min(W-18, g.measureText(quizQ).width+40);
+    g.fillStyle='rgba(6,8,22,.94)'; g.strokeStyle=T.glow; g.lineWidth=2.5;
+    g.beginPath(); g.roundRect(W/2-qw/2, base-74, qw, 50, 14); g.fill(); g.stroke();
+    g.fillStyle=T.glow; g.fillText(quizQ, W/2, base-59);
+    g.font='700 10.5px "Fredoka",system-ui,sans-serif'; g.fillStyle='#9fb0d8';
+    g.fillText('SHOOT THE SILLIEST ANSWER!', W/2, base-38);
+  }
+  g.font=ansFont();
+  for(const a of answers){
+    g.save(); g.translate(a.x, a.y+Math.sin(a.t*4)*3.5); g.rotate(Math.sin(a.t*2.2)*0.055);
+    g.shadowColor='#ffd24a'; g.shadowBlur=12;
+    g.fillStyle='rgba(8,12,30,.93)'; g.strokeStyle='#ffd24a'; g.lineWidth=2.5;
+    g.beginPath(); g.roundRect(-a.w/2,-a.h/2,a.w,a.h,12); g.fill(); g.stroke();
+    g.shadowBlur=0; g.fillStyle='#fff5dd';
+    g.fillText(a.txt,0,1);
+    g.restore();
+  }
+  g.textAlign='left'; g.textBaseline='alphabetic'; g.shadowBlur=0;
+}
+function hitAnswer(j,x,y){
+  const a=answers[j];
+  if(a.k==='silly'){
+    burst(x,y,26,'#ffd24a',300,0.8); burst(x,y,14,'#fff',200,0.5);
+    answers=[]; quizQ='';
+    if(boss){
+      boss.hp-=boss.max*0.17; boss.hit=0.32; boss.stun=2.3; boss.warn=0;
+      shake=22; flashT=0.28; sfx.wrongo(); ebul.length=0;
+      banner(pick(['THAT IS NOT A NUMBER!','DOES NOT COMPUTE!','KA-BLOOEY!','MY BRAIN!']));
+      addScore(300);
+      if(boss.hp<=0) killBoss();
+    }
+  } else {
+    answers.splice(j,1);
+    burst(x,y,8,'#8f9fb8',150,0.35); sfx.beepboop();
+    banner(a.k==='right' ? 'CORRECT! I LOVE THAT!' : 'CLOSE! NOT SILLY THOUGH!');
+  }
+}
+
 /* the original seasonal boss, artwork and all, kept as the third slot */
 const THEMEBOSS={
-  id:'theme', name:null, hpMul:1.15, tint:null,
+  id:'theme', name:null, hpMul:1.15, tint:null, hitR:86,
   draw(b){
     if(bossReady && bossImg){
       g.drawImage(bossImg,-95,-81,190,162);
@@ -1298,14 +1694,159 @@ const THEMEBOSS={
   }
 };
 
+/* ============================================================================
+   v0.3 -- BOSSES FALL APART, AND THE BITS ARE DANGEROUS
+   Every quarter of its health a boss loses a piece of itself. The piece is a real
+   object on the field: it hangs in the air flashing for half a second (the
+   telegraph), then falls. Touch it and it hurts. SHOOT it and it pops for points.
+   That last part matters -- a hazard you can fight back against is fun, one you
+   can only run from is homework.
+   ========================================================================== */
+const DEBRIS_CAP=12;
+function shed(kind,x,y,vx,r,hp){
+  if(!DEBRIS_ON) return;
+  if(debris.length>=DEBRIS_CAP) debris.shift();
+  debris.push({kind,x:clamp(x,26,Math.max(27,W-26)),y,vx,vy:0,gr:rnd(55,95),
+    rot:rnd(0,6.283),spin:rnd(-2.2,2.2),r,hp,max:hp,t:0,warn:0.55,life:13});
+}
+function bossBreak(b){
+  const id=(b.def&&b.def.id)||'theme';
+  shake=Math.max(shake,16); flashT=0.18;
+  if(id==='octo'){
+    banner('A TENTACLE FELL OFF!'); sfx.rip();
+    shed('tentacle', b.x+rnd(-60,60), b.y+40, rnd(-60,60), 22, 5);
+  } else if(id==='cop'){
+    banner('MOVE ALONG! MOVE ALONG!'); sfx.rip();
+    shed('barricade', b.x+rnd(-70,70), b.y+30, rnd(-50,50), 26, 6);
+  } else if(id==='lunch'){
+    banner('MYSTERY MEATLOAF!'); sfx.rip();
+    shed('meatloaf', b.x+rnd(-70,70), b.y+30, rnd(-45,45), 21, 5);
+  } else if(id==='prof'){
+    banner('HE GAVE HIMSELF AN A+!'); sfx.rip();
+    for(let i=0;i<2;i++) shed('worksheet', b.x+rnd(-80,80), b.y+30, rnd(-70,70), 18, 3);
+  } else {
+    banner('A BIT FELL OFF!'); sfx.rip();
+    shed('chunk', b.x+rnd(-60,60), b.y+30, rnd(-55,55), 20, 5);
+  }
+}
+function updDebris(dt){
+  for(let i=debris.length-1;i>=0;i--){
+    const d=debris[i]; d.t+=dt;
+    if(d.warn>0){ d.warn-=dt; continue; }          // hangs in the air first: telegraph
+    d.life-=dt; d.rot+=d.spin*dt;
+    d.vy=Math.min(d.vy+d.gr*dt,235);
+    d.x+=d.vx*dt; d.y+=d.vy*dt;
+    if(d.x<d.r){ d.x=d.r; d.vx=Math.abs(d.vx); }
+    if(d.x>W-d.r){ d.x=W-d.r; d.vx=-Math.abs(d.vx); }
+    if(state==='playing' && P.inv<=0 && Math.hypot(d.x-P.x,d.y-P.y)<d.r+P.r*0.8){
+      hurt(22, d.kind==='tentacle'?'FLOOMP!':d.kind==='meatloaf'?'SPLORT!':'WHACK!');
+      d.hp=0;
+    }
+    if(d.hp<=0 || d.life<=0 || d.y>H+70){
+      if(d.hp<=0 && d.life>0){ burst(d.x,d.y,16,T.glow,240,0.6); sfx.pop(); addScore(45); }
+      debris.splice(i,1);
+    }
+  }
+}
+function drawDebris(){
+  for(const d of debris){
+    g.save(); g.translate(d.x,d.y);
+    if(d.warn>0){                                   // the telegraph: flash in place
+      const p=Math.abs(Math.sin(d.warn*24));
+      g.globalAlpha=0.35+p*0.5;
+      g.strokeStyle='#ff4d6d'; g.lineWidth=3;
+      g.beginPath(); g.arc(0,0,d.r+8+p*10,0,6.283); g.stroke();
+      g.globalAlpha=0.5+p*0.5;
+    }
+    g.rotate(d.rot);
+    if(d.kind==='tentacle'){
+      g.strokeStyle='#7b4ae0'; g.lineCap='round'; g.lineWidth=13;
+      g.beginPath(); g.moveTo(-20,-10);
+      g.quadraticCurveTo(0,10+Math.sin(d.t*6)*8, 20,-8); g.stroke();
+      g.fillStyle='#c9a7ff';
+      for(let k=-1;k<=1;k++){ g.beginPath(); g.arc(k*13,2,3.2,0,6.283); g.fill(); }
+      g.fillStyle='#9be36f';                        // a little goo on the torn end
+      g.beginPath(); g.arc(-22,-11,5,0,6.283); g.fill();
+    } else if(d.kind==='barricade'){
+      g.fillStyle='#f5f1e6'; g.strokeStyle='#3a3f52'; g.lineWidth=2.5;
+      g.beginPath(); g.roundRect(-26,-8,52,16,4); g.fill(); g.stroke();
+      g.fillStyle='#e0533c';
+      for(let k=0;k<3;k++){ g.save(); g.translate(-18+k*18,0); g.rotate(0.6);
+        g.fillRect(-4,-11,8,22); g.restore(); }
+    } else if(d.kind==='meatloaf'){
+      g.fillStyle='#8a7a52'; g.strokeStyle='#5d5133'; g.lineWidth=3;
+      g.beginPath(); g.roundRect(-21,-13,42,26,7); g.fill(); g.stroke();
+      g.fillStyle='#a7e05a';
+      g.beginPath(); g.ellipse(-6,-3,6,4,0.3,0,6.283); g.fill();
+      g.beginPath(); g.ellipse(8,4,5,3.5,-0.2,0,6.283); g.fill();
+      g.strokeStyle='#a7e05a'; g.lineWidth=2.5; g.globalAlpha*=.8;
+      for(let k=-1;k<=1;k++){ g.beginPath();
+        g.moveTo(k*10,-15); g.quadraticCurveTo(k*10+5,-22,k*10,-29); g.stroke(); }
+    } else if(d.kind==='worksheet'){
+      g.fillStyle='#f6f8fd'; g.strokeStyle='#b9c4d8'; g.lineWidth=2;
+      g.beginPath(); g.roundRect(-15,-19,30,38,3); g.fill(); g.stroke();
+      g.strokeStyle='#c9d3e5'; g.lineWidth=1.6;
+      for(let k=0;k<5;k++){ g.beginPath(); g.moveTo(-10,-12+k*7); g.lineTo(10,-12+k*7); g.stroke(); }
+      /* v0.3 TONE FIX: this used to be a big red X. A worksheet that falls out of a
+         teacher and then hurts you, with a big red X on it, is a joke about bad
+         grades -- which is exactly the joke we are not making. So instead: the
+         Professor grades his OWN homework, and he gives himself top marks. */
+      g.fillStyle='#e0533c'; g.font='800 17px ui-monospace,monospace';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillText('A+',-1,1);
+      g.textAlign='left'; g.textBaseline='alphabetic';
+      g.fillStyle='#ffd24a';                                    // and a gold star sticker
+      g.beginPath();
+      for(let k=0;k<5;k++){ const a=-Math.PI/2+k*1.2566;
+        g.lineTo(8+Math.cos(a)*5.5,-13+Math.sin(a)*5.5);
+        g.lineTo(8+Math.cos(a+0.63)*2.4,-13+Math.sin(a+0.63)*2.4); }
+      g.closePath(); g.fill();
+    } else {
+      g.fillStyle=T.accent; g.strokeStyle='#0b0f22'; g.lineWidth=3;
+      g.beginPath(); g.arc(0,0,17,0,6.283); g.fill(); g.stroke();
+      g.fillStyle='#0b0f22';
+      g.beginPath(); g.arc(-5,-3,2.6,0,6.283); g.arc(5,-3,2.6,0,6.283); g.fill();
+    }
+    g.restore(); g.globalAlpha=1; g.lineCap='butt';
+  }
+  /* health pips on the tougher bits, so it is obvious they can be shot */
+  for(const d of debris){
+    if(d.warn>0 || d.hp>=d.max) continue;
+    const w=d.r*1.8, f=clamp(d.hp/d.max,0,1);
+    g.fillStyle='rgba(0,0,0,.55)'; g.fillRect(d.x-w/2,d.y+d.r+5,w,3.5);
+    g.fillStyle=T.glow; g.fillRect(d.x-w/2,d.y+d.r+5,w*f,3.5);
+  }
+}
+
+const ROSTER=[OCTO,COP,LUNCH,THEMEBOSS,PROF];
+
 /* ---- lightning columns: warn where, then strike. Always dodgeable. ---- */
+/* ============================================================================
+   v0.3 FIX -- THE LIGHTNING ACTUALLY AIMS AT YOU NOW
+   The columns used to land at rnd(20, W-20): pure chance, nothing to do with where
+   the ship was. Measured headlessly with the ship parked dead centre and never
+   dodging for 104 seconds: 2 lightning hits out of 22 total. So the one telegraphed
+   dodge in the whole game almost never had anything to dodge, which is why it read
+   as "the lightning does nothing".
+   Now the FIRST column is aimed at the lane you are standing in -- which is what
+   "A glowing blue column means lightning is about to hit that lane. Move." always
+   promised. The rest stay random, so it is a warning and not a guaranteed tag, and
+   the telegraph is still a very slow 0.7-0.85s.
+   ========================================================================== */
+function strike(n,warn,w){
+  const lo=12, hi=Math.max(13,W-12);
+  bolts.push({x:clamp(P.x+rnd(-6,6),lo,hi), warn:warn, live:0, w:w});
+  for(let i=1;i<n;i++)                       // the others are still luck of the draw,
+    bolts.push({x:rnd(20,Math.max(21,W-20)), // staggered so they do not all crack at once
+                warn:warn+rnd(0,0.14), live:0, w:w});
+}
 function updBolts(dt){
   for(let i=bolts.length-1;i>=0;i--){
     const L=bolts[i];
-    if(L.warn>0){ L.warn-=dt; if(L.warn<=0){ L.live=0.34; sfx.boom(); shake=Math.max(shake,10); } }
+    if(L.warn>0){ L.warn-=dt; if(L.warn<=0){ L.live=0.34; sfx.zap(); shake=Math.max(shake,10); } }
     else if(L.live>0){
       L.live-=dt;
-      if(state==='playing' && Math.abs(P.x-L.x)<L.w*0.5-P.r*0.25 && P.inv<=0) hurt();
+      if(state==='playing' && Math.abs(P.x-L.x)<L.w*0.5-P.r*0.25 && P.inv<=0) hurt(26,'ZAAAP!');
     } else bolts.splice(i,1);
   }
 }
@@ -1316,9 +1857,11 @@ function drawBolts(){
       g.fillStyle='#7cf0ff'; g.fillRect(L.x-L.w*0.5,0,L.w,H); g.globalAlpha=1;
     } else if(L.live>0){
       g.save(); g.shadowColor='#7cf0ff'; g.shadowBlur=26;
-      g.strokeStyle='#eafcff'; g.lineWidth=L.w*0.5; g.globalAlpha=clamp(L.live*3,0,1);
+      /* v0.3: the white bolt is drawn to match the damage window, so if it looks
+         like it touched you, it did. It used to wander wider than it could hurt. */
+      g.strokeStyle='#eafcff'; g.lineWidth=L.w*0.62; g.globalAlpha=clamp(L.live*3,0,1);
       g.beginPath(); let y=0,x=L.x; g.moveTo(x,y);
-      while(y<H){ y+=26; x=L.x+rnd(-11,11); g.lineTo(x,y); }
+      while(y<H){ y+=26; x=L.x+rnd(-5,5); g.lineTo(x,y); }
       g.stroke(); g.restore(); g.globalAlpha=1;
     }
   }
@@ -1327,10 +1870,14 @@ function drawBolts(){
 function spawnBoss(){
   const tough=1+Math.floor(wave/5);
   const D=bossFor(wave);
-  const base=(150+wave*22)*D.hpMul;
+  const base=(150+wave*22)*D.hpMul*BOSS_HP;
   boss={hp:base, max:base, x:W/2, y:-120, ty:H*0.20,
-        t:0, atk:1.6, warn:0, phase:1, hit:0, dir:Math.random()<.5?-1:1, tough, def:D};
-  bolts=[];
+        t:0, atk:1.6, warn:0, phase:1, hit:0, stun:0, broken:0,
+        dir:Math.random()<.5?-1:1, tough, def:D};
+  bolts=[]; answers=[]; quizQ=''; debris=[];
+  /* the Professor brings his own hazard: calculators, not seasonal snacks */
+  calcMode=(D.id==='prof');
+  if(calcMode) for(const f of foes) f.sprite='calc';
   const nm=D.name||T.bossName;
   $('bossbar').classList.add('on'); $('bossName').textContent=nm;
   banner('!! '+nm.toUpperCase()+' !!'); sfx.warn();
@@ -1340,6 +1887,19 @@ function updateBoss(dt){
   if(b.y<b.ty){ b.y+=110*dt; return; }
   const ratio=b.hp/b.max;
   b.phase = ratio>0.62?1 : ratio>0.3?2 : 3;
+  /* v0.3: every quarter of its health, a piece falls off */
+  const stage = ratio>0.75?0 : ratio>0.5?1 : ratio>0.25?2 : 3;
+  if(stage>b.broken){ b.broken=stage; bossBreak(b); }
+  if(b.broken>0 && Math.random()<0.30)          // it smokes now, visibly
+    parts.push({x:b.x+rnd(-46,46), y:b.y+rnd(-30,30), vx:rnd(-16,16), vy:rnd(-46,-18),
+      life:0.9, max:0.9, col:'#6b7590', r:rnd(2.4,5)});
+  if(b.stun>0){                                   // brain overload: he just spins
+    b.stun-=dt; b.warn=0;
+    b.x=clamp(b.x+Math.sin(b.t*17)*70*dt,110,Math.max(111,W-110));
+    b.y=b.ty+Math.sin(b.t*9)*12;
+    if(b.stun<=0) b.atk=1.5;
+    return;
+  }
   const spd=(b.phase===3?128:b.phase===2?98:74);
   b.x+=b.dir*spd*dt;
   if(b.x<110){ b.x=110; b.dir=1; } if(b.x>W-110){ b.x=W-110; b.dir=-1; }
@@ -1369,7 +1929,18 @@ function drawBoss(){
   if(b.warn>0 && Math.floor(b.warn*18)%2===0){ g.shadowColor='#fff'; g.shadowBlur=34; }
   else { g.shadowColor=D.tint||T.accent2; g.shadowBlur=20; }
   g.lineJoin='round';
+  /* v0.3: a damaged boss limps */
+  if(b.broken>0) g.rotate(Math.sin(b.t*4.5)*0.018*b.broken);
   D.draw(b);
+  /* v0.3 CONTACT TELEGRAPH: get near enough to be hit and the danger ring shows up */
+  const R=D.hitR||74, near=Math.hypot(b.x-P.x,(b.y-P.y)*0.86);
+  if(near<R+90 && state==='playing'){
+    g.save(); g.shadowBlur=0;
+    g.globalAlpha=clamp((R+90-near)/110,0,1)*(0.30+Math.abs(Math.sin(b.t*7))*0.35);
+    g.strokeStyle='#ff4d6d'; g.lineWidth=3; g.setLineDash([9,9]);
+    g.beginPath(); g.ellipse(0,0,R,R/0.86,0,0,6.283); g.stroke();
+    g.setLineDash([]); g.restore(); g.globalAlpha=1;
+  }
   if(b.hit>0 && D.id!=='theme'){
     g.globalAlpha=clamp(b.hit*3.5,0,0.6); g.fillStyle='#fff';
     g.beginPath(); g.arc(0,-6,74,0,6.283); g.fill(); g.globalAlpha=1;
@@ -1385,9 +1956,11 @@ function killBoss(){
   },i*95);
   sfx.bigboom(); shake=26; flashT=0.3;
   addScore(700+wave*90);
-  boss=null; bolts=[]; $('bossbar').classList.remove('on');
-  banner('WRECKED!');
-  if(shieldMax<3){ shieldMax++; shield=shieldMax; setTimeout(()=>banner('SHIELD UPGRADE x'+shieldMax),900); }
+  boss=null; bolts=[]; answers=[]; quizQ=''; calcMode=false; debris=[];
+  $('bossbar').classList.remove('on');
+  banner(pick(BOOMS));
+  if(shieldMax<3){ shieldMax++; shield=shieldMax+SHIELD_BONUS;
+    setTimeout(()=>banner('SHIELD UPGRADE x'+shield),900); }
   if(!gunUnlockNext()) addScore(400);
   od=Math.min(100,od+30);
 }
@@ -1452,15 +2025,24 @@ function bumpCombo(){
 }
 
 /* ================= damage ================= */
-function hurt(){
+function hurt(dmg,word){
   if(P.inv>0||state!=='playing') return;
+  dmg=dmg||22;
   combo=0; bumpCombo();
   burst(P.x,P.y,20,'#ff4d6d',250,0.62);
-  shake=16; sfx.ouch(); P.inv=1.25;
-  if(shield>0){ shield--; banner(shield>0?('SHIELD '+shield+' LEFT'):'SHIELD DOWN'); P.inv=Math.max(P.inv,0.9); return; }
-  if(tier>1){ tier--; updHUD(); banner('WEAPON DOWN'); return; }
-  lives--; updHUD(); flashT=0.26;
-  if(lives<0) gameOver(); else banner('SHIP LOST');
+  shake=Math.max(shake,15); sfx.ouch();
+  P.inv=1.15; hitFlash=0.32;                 // every hit now LOOKS and SOUNDS like a hit
+  if(shield>0){
+    shield--; sfx.pick(); burst(P.x,P.y,16,'#5fe39a',210,0.5);
+    banner(shield>0?('SHIELD HELD! '+shield+' LEFT'):'SHIELD DOWN!');
+    P.inv=Math.max(P.inv,0.95); return;
+  }
+  hull-=dmg; updHUD(); bumpHull();
+  if(hull>0){ banner(word||pick(HITWORDS)); return; }
+  /* hull gone: that costs a ship, and knocks the gun down a tier */
+  hull=HULL_MAX; lives--; tier=Math.max(1,tier-1);
+  P.inv=2.0; flashT=0.3; shake=22; sfx.boom(); updHUD();
+  if(lives<0) gameOver(); else banner('SHIP LOST! KA-BLAMMO!');
 }
 
 /* ================= overdrive ================= */
@@ -1473,7 +2055,7 @@ function nova(){
   for(let i=0;i<44;i++){ const a=i/44*6.283;
     parts.push({x:P.x,y:P.y,vx:Math.cos(a)*rnd(250,470),vy:Math.sin(a)*rnd(250,470),
       life:0.85,max:0.85,col:i%2?T.glow:'#fff',r:rnd(2,4.7)}); }
-  banner('OVERDRIVE');
+  banner(pick(['OVERDRIVE!','ZAAAAP!','KA-POW!','FWOOOSH!']));
 }
 
 /* ================= collisions ================= */
@@ -1508,6 +2090,28 @@ function collide(dt){
       if(!b.pierce) gone=true;
       if(boss.hp<=0){ killBoss(); }
     }
+    if(!gone && debris.length){
+      for(let j=0;j<debris.length;j++){
+        const d=debris[j];
+        if(d.warn>0) continue;
+        if(Math.hypot(b.x-d.x,b.y-d.y)<d.r+b.r){
+          if(b.pierce){ if(!b.seen) b.seen=[]; if(b.seen.indexOf(d)>=0) continue; b.seen.push(d); }
+          d.hp-=b.dmg; burst(b.x,b.y,3,T.glow,120,0.2);
+          if(!b.pierce) gone=true;
+          break;
+        }
+      }
+    }
+    if(!gone && answers.length){
+      for(let j=answers.length-1;j>=0;j--){
+        const a=answers[j];
+        if(Math.abs(b.x-a.x)<a.w/2+b.r && Math.abs(b.y-a.y)<a.h/2+b.r){
+          hitAnswer(j,b.x,b.y);
+          if(!b.pierce) gone=true;
+          break;
+        }
+      }
+    }
     if(!gone){
       for(let j=0;j<foes.length;j++){
         const f=foes[j];
@@ -1529,14 +2133,23 @@ function collide(dt){
   for(let i=ebul.length-1;i>=0;i--){
     const b=ebul[i];
     b.x+=b.vx*dt; b.y+=b.vy*dt;
+    if(b.spin) b.rot=(b.rot||0)+b.spin*dt;
     if(b.y<-50||b.y>H+50||b.x<-50||b.x>W+50){ ebul.splice(i,1); continue; }
-    if(P.inv<=0 && Math.hypot(b.x-P.x,b.y-P.y)<b.r+P.r){ ebul.splice(i,1); hurt(); }
+    if(P.inv<=0 && Math.hypot(b.x-P.x,b.y-P.y)<b.r+P.r){
+      ebul.splice(i,1); hurt(b.calc?22:20, b.calc?'BEEP! BONK!':null); }
   }
   if(P.inv<=0){
     for(const f of foes){
-      if(Math.hypot(f.x-P.x,f.y-P.y)<f.r+P.r){ f.hp-=3; f.hit=0.15; hurt(); break; }
+      if(Math.hypot(f.x-P.x,f.y-P.y)<f.r+P.r){ f.hp-=3; f.hit=0.15; hurt(20,'SMACK!'); break; }
     }
-    if(boss && boss.y>0 && Math.hypot(boss.x-P.x,boss.y-P.y)<70) hurt();
+    /* v0.3 CONTACT DAMAGE. Each boss carries its own reach, so the octopus's
+       tentacles can actually catch you instead of passing through. Telegraphed by
+       the red ring drawn in drawBoss() whenever you get near it. */
+    if(boss && boss.y>0){
+      const R=(boss.def&&boss.def.hitR)||74;
+      const dx=boss.x-P.x, dy=(boss.y-P.y)*0.86;
+      if(Math.hypot(dx,dy)<R+P.r*0.4) hurt(18, boss.def&&boss.def.id==='octo'?'SLAP! A TENTACLE!':'THUD!');
+    }
   }
 }
 
@@ -1548,8 +2161,16 @@ function updHUD(){
   $('wep').innerHTML=G.n+' <b>'+w.r+'</b>'+(many?' <span style="opacity:.55">\u21bb</span>':'');
   $('wep').style.color=G.c;
   let h='';
-  for(let i=0;i<Math.max(lives+1,0);i++) h+='<div class="pip"></div>';
+  for(let i=0;i<clamp(lives+1,0,6);i++) h+='<div class="pip"></div>';
   $('lives').innerHTML=h;
+  const frac=clamp(hull/HULL_MAX,0,1), hb=$('hull');
+  $('hullFill').style.width=(frac*100)+'%';
+  hb.classList.toggle('low', frac<=0.55 && frac>0.28);
+  hb.classList.toggle('crit', frac<=0.28);
+}
+function bumpHull(){
+  const hb=$('hull');
+  hb.classList.remove('bump'); void hb.offsetWidth; hb.classList.add('bump');
 }
 function updOD(){
   $('odFill').style.height=od+'%';
@@ -1559,6 +2180,234 @@ function updOD(){
 function banner(t){
   const el=$('banner'); el.textContent=t;
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+</script>
+
+
+<script>
+"use strict";
+/* ============================================================================
+   THE TINKER DECK
+   A kid taps + and a real global variable changes. That is the entire trick, and
+   it is not a trick: every knob below names a variable that the game reads on the
+   very next frame, and every code box quotes the real line from this file.
+
+   Two rules kept it safe to hand to a 10-year-old:
+     1. Every value is CLAMPED. Silly is allowed (a magnet that vacuums the whole
+        screen is funny); broken is not (a fire rate of zero is not).
+     2. There is always a big obvious PUT IT ALL BACK button.
+   No eval, no text boxes, no way to type something the game cannot survive.
+   ========================================================================== */
+const KNOBS=[
+ {k:'MAGNET_RADIUS', d:105, min:0, max:900, step:15, unit:'px', flag:true,
+  note:'How close a pickup has to be before it flies to you. Crank it to 900 and the whole screen comes running.',
+  src:'<i>// in updateDrops()</i>\nif (dist &lt; <b>MAGNET_RADIUS</b>) {\n  d.x += dx / dist * MAGNET_PULL * dt;\n  d.y += dy / dist * MAGNET_PULL * dt;\n}'},
+ {k:'MAGNET_PULL', d:185, min:0, max:1200, step:20, unit:'px/sec', flag:true,
+  note:'How FAST a pickup flies once it decides to come and get you.',
+  src:'d.x += dx / dist * <b>MAGNET_PULL</b> * dt;'},
+ {k:'FIRE_RATE', d:1, min:0.35, max:3, step:0.05, unit:'x',
+  note:'Bigger number, more bullets. Your gun does not need a tap -- it just goes.',
+  src:'P.fire = TIERS[tier-1].cd * (GUNS[gun].cd/0.165) / <b>FIRE_RATE</b>;'},
+ {k:'SHOT_SPREAD', d:1, min:0.2, max:3, step:0.1, unit:'x',
+  note:'How wide your shots fan out. 0.2 is a laser beam, 3 is a sneeze.',
+  src:'<i>// in shoot(), the Scatter gun</i>\nconst a = -Math.PI/2 + (i-(n-1)/2) * 0.10 * <b>SHOT_SPREAD</b>;'},
+ {k:'SHIELD_BONUS', d:0, min:0, max:4, step:1, unit:'layers',
+  note:'Extra shield layers on every S you grab. Each layer eats one whole hit.',
+  src:'shield = shieldMax + <b>SHIELD_BONUS</b>;'},
+ {k:'HULL_MAX', d:100, min:50, max:300, step:10, unit:'hull',
+  note:'How much one ship can take before you lose it. Most hits cost about 20.',
+  src:'hull -= dmg;\nif (hull &lt;= 0) { hull = <b>HULL_MAX</b>; lives--; }'},
+ {k:'SHIP_SPEED', d:13, min:6, max:30, step:1, unit:'',
+  note:'How fast the ship catches up to your finger. Low = floaty, high = twitchy.',
+  src:'const k = Math.min(1, dt * <b>SHIP_SPEED</b>);\nP.x += (P.tx - P.x) * k;'},
+ {k:'ENEMY_SPEED', d:1, min:0.3, max:2, step:0.05, unit:'x',
+  note:'Speed of everything trying to squash you.',
+  src:'spd: (1 + Math.min(0.55, wave*0.02)) * <b>ENEMY_SPEED</b>'},
+ {k:'BOSS_HP', d:1, min:0.25, max:2.5, step:0.05, unit:'x',
+  note:'How chunky the bosses are. 0.25 makes them cream puffs.',
+  src:'const base = (150 + wave*22) * D.hpMul * <b>BOSS_HP</b>;'},
+ {k:'DEBRIS_ON', d:1, min:0, max:1, step:1, unit:'0=off 1=on',
+  note:'Do bosses drop dangerous bits of themselves when you hurt them?',
+  src:'function shed(kind, x, y, ...) {\n  if (!<b>DEBRIS_ON</b>) return;   <i>// nothing falls off</i>\n  ...\n}'}
+];
+const KMAP={}; for(const K of KNOBS) KMAP[K.k]=K;
+
+function kround(K,v){
+  v=Math.round(v/K.step)*K.step;
+  v=Math.min(K.max,Math.max(K.min,v));
+  return Math.abs(v-Math.round(v))<1e-9 ? Math.round(v) : +v.toFixed(2);
+}
+function kget(k){ const v=window[k]; return (typeof v==='number' && isFinite(v)) ? v : KMAP[k].d; }
+function kset(k,v){
+  const K=KMAP[k];
+  window[k]=kround(K,v);
+  if(k==='HULL_MAX' && typeof hull==='number') hull=Math.min(hull,HULL_MAX);
+  saveTune();
+}
+function tuneDefaults(){ for(const K of KNOBS) window[K.k]=K.d; NEXT_BOSS=-1;
+  if(typeof hull==='number') hull=Math.min(hull,HULL_MAX); saveTune(); }
+function saveTune(){
+  try{
+    const o={NEXT_BOSS:NEXT_BOSS};
+    for(const K of KNOBS) o[K.k]=kget(K.k);
+    LS.set('sw_tune',JSON.stringify(o));
+  }catch(e){}
+}
+function loadTune(){
+  try{
+    const raw=LS.get('sw_tune'); if(!raw) return;
+    const o=JSON.parse(raw); if(!o||typeof o!=='object') return;
+    for(const K of KNOBS) if(typeof o[K.k]==='number' && isFinite(o[K.k])) window[K.k]=kround(K,o[K.k]);
+    if(typeof o.NEXT_BOSS==='number') NEXT_BOSS=Math.max(-1,Math.min(4,Math.round(o.NEXT_BOSS)));
+  }catch(e){ /* corrupt or blocked storage: just play with the defaults */ }
+}
+
+function bossLabel(i){
+  const D=ROSTER[i];
+  return (D && D.name) ? D.name.split(',')[0] : 'The seasonal monster';
+}
+function knobHTML(K){
+  const v=kget(K.k), pct=((v-K.min)/(K.max-K.min))*100;
+  return `<div class="knob${K.flag?' flag':''}">
+    <div class="knobtop"><code>${K.k}</code>
+      <span class="kv" id="kv_${K.k}">${v}<small>${K.unit}</small></span></div>
+    <div class="kbar"><i id="kb_${K.k}" style="width:${clamp(pct,0,100)}%"></i></div>
+    <div class="knote">${K.note}</div>
+    <div class="krow">
+      <button class="kbtn" data-k="${K.k}" data-d="-8">&laquo;</button>
+      <button class="kbtn" data-k="${K.k}" data-d="-1">&minus;</button>
+      <button class="kbtn" data-k="${K.k}" data-d="1">+</button>
+      <button class="kbtn" data-k="${K.k}" data-d="8">&raquo;</button>
+    </div>
+    <pre class="ksrc">${K.src}</pre>
+  </div>`;
+}
+function paintKnob(k){
+  const K=KMAP[k], v=kget(k);
+  const el=$('kv_'+k); if(el) el.innerHTML=v+'<small>'+K.unit+'</small>';
+  const b=$('kb_'+k); if(b) b.style.width=clamp(((v-K.min)/(K.max-K.min))*100,0,100)+'%';
+}
+
+let deckFrom='menu';
+function tinker(from){
+  if(from) deckFrom=from;
+  showCard(`<div class="tag">Secret engineering panel</div>
+    <h2>THE TINKER DECK</h2>
+    <p class="small">These are <b>real variables in the real game</b>. Change one and the
+      very next frame does what you said. Nothing here can break it &mdash; every number
+      is fenced in, and <b>PUT IT ALL BACK</b> undoes the lot.</p>
+    <button class="xbtn" id="xMag">&#9733; How does the MAGNET work?</button>
+    <button class="xbtn" id="xBoss">How does the game pick a BOSS?</button>
+    <button class="xbtn" id="xGun">What even IS a weapon?</button>
+    <button class="xbtn" id="xShip">How does the ship follow my finger?</button>
+    <div class="deckhead"><span class="tag">Boss coming up next</span></div>
+    <div class="bosspick" id="bossPick">
+      <button data-b="-1" aria-pressed="${NEXT_BOSS<0}">Take turns (normal)</button>
+      ${ROSTER.map((d,i)=>`<button data-b="${i}" aria-pressed="${NEXT_BOSS===i}">${bossLabel(i)}</button>`).join('')}
+    </div>
+    <div class="deckhead"><span class="tag">Knobs</span></div>
+    <div class="deckwrap" id="deckWrap">${KNOBS.map(knobHTML).join('')}</div>
+    <div class="deckfoot">
+      <button class="ghost" id="resetTune">Put it all<br>back to normal</button>
+      <button class="big" id="deckDone">${deckFrom==='pause'?'BACK TO<br>THE FIGHT':'DONE'}</button>
+    </div>`);
+
+  $('deckWrap').addEventListener('click',function(e){
+    const b=e.target.closest('button[data-k]'); if(!b) return;
+    const k=b.dataset.k, K=KMAP[k];
+    kset(k, kget(k) + K.step*(+b.dataset.d));
+    paintKnob(k); sfx.tap();
+    if(k==='HULL_MAX'||k==='SHIELD_BONUS') updHUD();
+  });
+  $('bossPick').addEventListener('click',function(e){
+    const b=e.target.closest('button[data-b]'); if(!b) return;
+    NEXT_BOSS=+b.dataset.b; saveTune(); sfx.tap();
+    [].forEach.call($('bossPick').children,function(c){
+      c.setAttribute('aria-pressed', (+c.dataset.b===NEXT_BOSS)?'true':'false'); });
+  });
+  $('resetTune').onclick=function(){
+    tuneDefaults(); sfx.power(); updHUD(); tinker();
+  };
+  $('deckDone').onclick=function(){
+    if(deckFrom==='pause' && state==='paused') resume(); else menu();
+  };
+  $('xMag').onclick=()=>explain('magnet');
+  $('xBoss').onclick=()=>explain('boss');
+  $('xGun').onclick=()=>explain('gun');
+  $('xShip').onclick=()=>explain('ship');
+}
+
+const XPLAIN={
+magnet:{h:'THE MAGNET',b:`
+  <p>Every pickup asks the same question about sixty times a second:
+     <b>how far away is the ship, and which way is it?</b></p>
+  <pre class="ksrc">const dx = P.x - d.x;   <i>// the left/right gap</i>
+const dy = P.y - d.y;   <i>// the up/down gap</i>
+const dist = Math.hypot(dx, dy);</pre>
+  <p><b>dx</b> and <b>dy</b> together are a <b>vector</b> &mdash; an arrow pointing from the
+     pickup to your ship. <code>Math.hypot</code> is just the length of that arrow.</p>
+  <pre class="ksrc">if (dist &lt; <b>MAGNET_RADIUS</b>) {
+  d.x += dx / dist * <b>MAGNET_PULL</b> * dt;
+  d.y += dy / dist * <b>MAGNET_PULL</b> * dt;
+}</pre>
+  <p>Dividing by <code>dist</code> is the sneaky bit. It squashes the arrow down to
+     length 1: it keeps the <b>direction</b> and throws away the <b>distance</b>.
+     Then <code>MAGNET_PULL</code> says how fast to travel in that direction, and
+     <code>dt</code> &mdash; the time since the last frame &mdash; keeps it smooth on a fast
+     iPad and a slow one.</p>
+  <p>Leave the divide out and far-away pickups would rocket at you while close ones
+     crawled, because a longer arrow means bigger numbers.</p>
+  <p class="small"><b>Go and try it:</b> set <code>MAGNET_RADIUS</code> to 900. The whole
+     screen comes to you like an extremely obedient dog.</p>`},
+boss:{h:'HOW A BOSS GETS PICKED',b:`
+  <p>The game does not know a single boss by name. It knows one <b>list</b>:</p>
+  <pre class="ksrc">const ROSTER = [OCTO, COP, LUNCH, THEMEBOSS, PROF];</pre>
+  <p>and one tiny bit of counting:</p>
+  <pre class="ksrc">function bossFor(w) {
+  const n = Math.floor(w / 5);      <i>// wave 5 -&gt; 1, wave 10 -&gt; 2 ...</i>
+  return ROSTER[(n - 1) % ROSTER.length];
+}</pre>
+  <p>That <code>%</code> is the <b>remainder</b>. When the count runs off the end of the
+     list it wraps back to the front, so the bosses take turns forever without anybody
+     writing "and then go back to the octopus".</p>
+  <p>Which means: <b>add one more thing to that list and the game grows a new boss.</b>
+     Nothing else has to change. That is the whole point of a list.</p>`},
+gun:{h:'WHAT EVEN IS A WEAPON?',b:`
+  <p>A weapon is not code. It is just an <b>object</b> &mdash; a bag of labelled numbers:</p>
+  <pre class="ksrc">const GUNS = [
+  {id:'cannon',  n:'Cannon',   cd:0.165, dmg:1,   c:'#fff5dd'},
+  {id:'scatter', n:'Scatter',  cd:0.30,  dmg:0.8, c:'#ffd07a'},
+  {id:'lance',   n:'Lance',    cd:0.115, dmg:1.3, c:'#c9f6ff'},
+  {id:'seeker',  n:'Seeker',   cd:0.42,  dmg:1.6, c:'#b9f5a0'},
+  {id:'ricochet',n:'Ricochet', cd:0.24,  dmg:1.1, c:'#f7a8ff'}
+];</pre>
+  <p><code>cd</code> is the <b>cooldown</b>: seconds of waiting between shots, so a
+     <i>smaller</i> number is a <i>faster</i> gun. <code>dmg</code> is how hard one bullet
+     hits. <code>c</code> is literally just the colour.</p>
+  <p>The Seeker is slow (0.42) but hits hard (1.6). The Lance is fast (0.115) and
+     pierces. Nobody wrote a whole new program for either one &mdash; somebody added a
+     line to a list and picked some numbers.</p>
+  <p class="small"><b>Try it:</b> turn <code>FIRE_RATE</code> up and every gun in that
+     list gets faster at once, because they all read from the same place.</p>`},
+ship:{h:'HOW THE SHIP FOLLOWS YOUR FINGER',b:`
+  <p>The ship never teleports to your finger. It walks a <i>fraction</i> of the way there,
+     every frame:</p>
+  <pre class="ksrc">const k = Math.min(1, dt * <b>SHIP_SPEED</b>);
+P.x += (P.tx - P.x) * k;   <i>// P.tx is where your finger is</i>
+P.y += (P.ty - P.y) * k;</pre>
+  <p><code>(P.tx - P.x)</code> is the gap. Multiply the gap by a small <code>k</code> and
+     you close a slice of it &mdash; then next frame the gap is smaller, so you move less.
+     It glides in and settles instead of snapping. Programmers call this
+     <b>lerping</b>, which is short for "linear interpolation" and sounds like a burp.</p>
+  <p class="small"><b>Try it:</b> <code>SHIP_SPEED</code> at 6 feels like flying a bathtub.
+     At 30 the ship is glued to your thumb.</p>`}
+};
+function explain(id){
+  const X=XPLAIN[id];
+  showCard(`<div class="tag">How this works</div>
+    <div class="xplain"><h3>${X.h}</h3>${X.b}</div>
+    <button class="big" id="xBack">BACK TO THE DECK</button>`);
+  $('xBack').onclick=()=>tinker();
 }
 </script>
 
@@ -1606,13 +2455,13 @@ function update(dt){
     P.tx=P.x+((kr?1:0)-(kl?1:0))*v*4; P.ty=P.y+((kd?1:0)-(ku?1:0))*v*4;
   }
   P.tx=clamp(P.tx,20,W-20); P.ty=clamp(P.ty,70,H-30);
-  const k=Math.min(1,dt*13);
+  const k=Math.min(1,dt*SHIP_SPEED);
   const px=P.x;
   P.x+=(P.tx-P.x)*k; P.y+=(P.ty-P.y)*k;
   P.thrust=clamp(Math.abs(P.x-px)*0.06,0,1);
 
   P.fire-=dt;
-  if(P.fire<=0){ P.fire=TIERS[tier-1].cd*(GUNS[gun].cd/0.165); shoot(); }
+  if(P.fire<=0){ P.fire=TIERS[tier-1].cd*(GUNS[gun].cd/0.165)/FIRE_RATE; shoot(); }
 
   pumpWave(dt);
   updateFoes(dt);
@@ -1622,11 +2471,14 @@ function update(dt){
     $('bossFill').style.width=clamp(boss.hp/boss.max*100,0,100)+'%';
   }
   updateDrops(dt);
+  updDebris(dt);
+  updAnswers(dt);
   collide(dt);
   updateParts(dt);
   od=Math.min(100,od); updOD();
   if(shake>0) shake=Math.max(0,shake-dt*44);
   if(flashT>0) flashT-=dt;
+  if(hitFlash>0) hitFlash-=dt;
 }
 function draw(dt){
   g.clearRect(0,0,W,H);
@@ -1640,13 +2492,22 @@ function draw(dt){
   drawDrops();
   drawBolts();
   if(boss) drawBoss();
+  drawDebris();
   drawFoes();
+  drawAnswers();
   drawBullets();
   if(state!=='over') drawShip(P,dt);
   drawParts();
   g.restore();
 
   if(flashT>0){ g.fillStyle='rgba(255,255,255,'+clamp(flashT*1.5,0,0.5)+')'; g.fillRect(0,0,W,H); }
+  /* v0.3: a red rim on every hit, so a hit always LOOKS like a hit */
+  if(hitFlash>0){
+    const a=clamp(hitFlash*2.0,0,0.6);
+    const rg=g.createRadialGradient(W/2,H/2,Math.min(W,H)*0.26,W/2,H/2,Math.max(W,H)*0.66);
+    rg.addColorStop(0,'rgba(255,40,80,0)'); rg.addColorStop(1,'rgba(255,40,80,'+a+')');
+    g.fillStyle=rg; g.fillRect(0,0,W,H);
+  }
 }
 let framesDrawn=0;
 function frame(ts){
@@ -1660,10 +2521,11 @@ function frame(ts){
 /* ================= flow ================= */
 function newRun(){
   hideCard();
-  bullets=[];foes=[];ebul=[];drops=[];parts=[];
+  bullets=[];foes=[];ebul=[];drops=[];parts=[];debris=[];
   boss=null; $('bossbar').classList.remove('on');
   score=0; combo=0; mult=1; od=0; lives=3; tier=1; shield=0; runKills=0;
   gun=0; unlocked=[true,false,false,false,false]; bolts=[]; shieldMax=1;
+  answers=[]; quizQ=''; calcMode=false; debris=[]; hull=HULL_MAX; hitFlash=0;
   wave=0; waveClearT=1.6; spawnQ=[]; spawnT=0; shake=0; flashT=0; bossPending=0;
   P=newShip(); seedStars();
   bumpCombo(); updHUD(); updOD();
@@ -1682,9 +2544,11 @@ function pause(){
       <div class="stat"><div class="v">x${mult}</div><div class="k">Combo</div></div>
     </div>
     <button class="big" id="resBtn">RESUME</button>
+    <button class="ghost" id="tinkBtn2">&#128295; The Tinker Deck</button>
     <button class="ghost" id="muteBtn">Music &amp; sound</button>
     <button class="ghost" id="quitBtn">Quit to title</button>`);
   $('resBtn').onclick=resume;
+  $('tinkBtn2').onclick=()=>tinker('pause');
   $('muteBtn').onclick=()=>{ cycleAudio(); $('muteBtn').textContent=audioLabel(); };
   $('muteBtn').textContent=audioLabel();
   $('quitBtn').onclick=()=>{ state='menu'; stopMusic(); menu(); };
@@ -1700,6 +2564,7 @@ function gameOver(){
   const best=score>SV.hi;
   SV.hi=Math.max(SV.hi,score); SV.bw=Math.max(SV.bw,wave);
   SV.kills=SV.kills+runKills; SV.runs=SV.runs+1;
+  const joke=Math.random()<0.5;
   setTimeout(()=>{
     showCard(`<div class="tag">${best?'New personal best':'Run over'}</div>
       <h2>${best?'BEST RUN YET!':'Ship down'}</h2>
@@ -1709,7 +2574,7 @@ function gameOver(){
         <div class="stat"><div class="v">${runKills}</div><div class="k">Wrecked</div></div>
       </div>
       <p class="small">Best ever: <b style="color:var(--glow)">${money(SV.hi)}</b> &nbsp;&middot;&nbsp; furthest wave ${SV.bw}</p>
-      <div class="scroll"><span class="lbl">Transmission from deep space</span>${pick(FACTS)}</div>
+      <div class="scroll"><span class="lbl">${joke?'Joke from the ship computer':'Transmission from deep space'}</span>${joke?pick(JOKES):pick(FACTS)}</div>
       <button class="big" id="againBtn">FLY AGAIN</button>
       <button class="ghost" id="titleBtn">Title screen</button>`);
     $('againBtn').onclick=newRun;
@@ -1739,7 +2604,8 @@ $('soundBtn').addEventListener('click',cycleAudio);
 function menu(){
   hideCard();
   showCard(`<h1>STAR<br>WRECKER</h1>
-    <p class="small">Drag to fly. You shoot automatically. Tap your weapon to swap it. Wreck everything.</p>
+    <p class="small">Drag to fly. You shoot automatically. Tap your weapon to swap it.
+      Wreck the flies, the socks and the smell. KA-BLAMMO!</p>
     <div class="stats">
       <div class="stat"><div class="v">${money(SV.hi)}</div><div class="k">Best score</div></div>
       <div class="stat"><div class="v">${SV.bw}</div><div class="k">Best wave</div></div>
@@ -1747,9 +2613,11 @@ function menu(){
     </div>
     <button class="big" id="playBtn">PLAY</button>
     <button class="ghost" id="howBtn">How to play</button>
+    <button class="ghost" id="tinkBtn">&#128295; The Tinker Deck &mdash; change the code</button>
     <button class="ghost" id="seasonBtn">Season: ${T.label}</button>`);
   $('playBtn').onclick=newRun;
   $('howBtn').onclick=how;
+  $('tinkBtn').onclick=()=>tinker('menu');
   $('seasonBtn').onclick=seasons;
 }
 function how(){
@@ -1758,12 +2626,24 @@ function how(){
       <li><b>Drag anywhere</b> to move. Your ship rides just above your finger so you can see it.</li>
       <li>You <b>fire automatically</b>. Never tap to shoot.</li>
       <li>Grab <b>W</b> to upgrade your gun, <b>S</b> for a shield, <b>&#42;</b> for overdrive fuel.</li>
-      <li>Getting hit <b>knocks your weapon down a tier</b> instead of killing you. You only lose a
-        ship if you're already at Cannon I.</li>
+      <li>Your <b>hull</b> is the little bar next to your ships, bottom left. A hit takes a bite
+        out of it instead of costing you a whole ship &mdash; that is about <b>five</b> mistakes
+        per ship. Lose the hull and you lose a ship <i>and</i> a weapon tier.</li>
+      <li>A <b>shield</b> eats one whole hit and the hull never even feels it. Grab <b>H</b> to
+        <b>patch the hull back up</b> &mdash; it turns up more often once you're banged up.</li>
+      <li><b>Do not touch a boss.</b> When a red dashed ring appears around it, you're close
+        enough to get thumped. The octopus has a very long reach.</li>
+      <li>Hurt a boss enough and <b>bits fall off it</b> &mdash; a tentacle, a barricade, a
+        meatloaf. They hang in the air flashing red for half a second, then drop.
+        Dodge them, or <b>shoot them</b> for points.</li>
       <li>Kills without getting hit build a <b>combo</b> &mdash; up to <b>x5 score</b>. Getting hit resets it.</li>
       <li>When <b>OVERDRIVE</b> lights up, tap it: everything on screen takes a hit and all enemy
         fire is wiped. Save it for the boss.</li>
       <li>Every <b>5th wave</b> is a boss, and they take turns: the <b>Electric Space Octopus</b>, <b>Officer Grumbles</b> the zombie school cop, <b>Lunchlady Gorgonzola</b>, the seasonal monster, then <b>Professor Von Homework</b>. Each changes its attack as its health drops.</li>
+      <li>The Professor throws <b>calculators</b> at you and yells <b>POP QUIZ!!</b> Three answers float
+        past. Shoot the <b>silliest</b> one &mdash; a right answer only makes him happier, but an answer
+        like <b>A BURRITO</b> overloads his brain and he spins in circles going
+        <b>DOES NOT COMPUTE</b>. That is when you hit him.</li>
       <li>Beat a boss and you <b>unlock a new gun</b>. Tap the weapon name at the bottom left to <b>swap</b> between the ones you have &mdash; Cannon, Scatter, Lance, Seeker, Ricochet.</li>
       <li>A glowing blue column means <b>lightning is about to hit that lane</b>. Move.</li>
     </ul>
@@ -1794,6 +2674,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden && state==
 
 /* ================= boot ================= */
 resize(); 
+loadTune();
 applyTheme(SV.over||seasonFor(new Date()));
 stopMusic();
 P=newShip(); seedStars(); updHUD(); updOD(); bumpCombo(); paintSound();
