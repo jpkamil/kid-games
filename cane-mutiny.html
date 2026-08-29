@@ -106,7 +106,7 @@ body{
   text-shadow:0 2px 8px rgba(0,0,0,.9)}
 .roundlbl{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#c5bade}
 .btns{display:flex;gap:6px;margin-top:7px;pointer-events:auto}
-.ibtn{width:40px;height:40px;border-radius:12px;border:1.5px solid var(--edge);
+.ibtn{position:relative;width:40px;height:40px;border-radius:12px;border:1.5px solid var(--edge);
   background:rgba(20,16,31,.85);color:var(--dim);font-size:15px;font-family:inherit;
   cursor:pointer;display:grid;place-items:center;transition:.15s;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);touch-action:manipulation}
@@ -136,10 +136,20 @@ body{
 .order li{display:flex;align-items:center;gap:6px;font-size:clamp(11px,3.2vw,13px);line-height:1.1}
 .order li .em{font-size:16px;line-height:1}
 .order li.done{color:var(--good);text-decoration:line-through;opacity:.75}
-/* it drops out of the way when it would cover Gerald -- you have to be able to
-   watch him take the cane to you, and watch him dance when you get it right */
-.order{transition:opacity .16s ease}
-.order.ducked{opacity:.07}
+/* The card is opt-in: tap the phone to read the order, tap again to put it away.
+   It used to sit there permanently, on top of Gerald's curb, so it covered the one
+   thing you want to watch -- him caning you, or dancing when you get it right. */
+.order{opacity:0;transform:translateY(6px);transition:opacity .16s ease,transform .16s ease}
+.order.open{opacity:1;transform:none}
+.badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:99px;
+  background:var(--sun);color:#231a3d;font-size:10px;font-weight:700;
+  display:grid;place-items:center;padding:0 3px;font-family:'Roboto Mono',monospace}
+.badge:empty{display:none}
+/* the order as it arrives, in the popup */
+.olist{list-style:none;display:flex;flex-direction:column;gap:7px;margin:11px 0 3px;
+  background:rgba(10,8,18,.5);border:1px solid var(--edge);border-radius:12px;padding:11px 13px}
+.olist li{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--chalk)}
+.olist .em{font-size:23px;line-height:1}
 
 /* cart */
 .cart{display:flex;gap:5px;pointer-events:none;justify-content:flex-end;flex-wrap:wrap;
@@ -166,6 +176,8 @@ body{
 .abtn.big{width:74px;height:74px;font-size:12px;letter-spacing:.02em}
 .abtn.sm{width:56px;height:56px;font-size:11px}
 .abtn.grab{border-color:var(--sun);color:var(--sun)}
+.abtn.grab.handover{border-color:var(--good);color:var(--good);
+  box-shadow:0 0 0 3px rgba(140,227,79,.20),0 8px 20px rgba(0,0,0,.45)}
 .abtn.grab.hot{background:var(--sun);color:#2b1d00;box-shadow:0 0 18px rgba(255,207,61,.6)}
 .abtn.fire{border-color:var(--sky);color:var(--sky)}
 .abtn:active{transform:scale(.9)}
@@ -270,6 +282,7 @@ body{
       <div class="btns">
         <button class="ibtn" id="bPause" aria-label="Pause">II</button>
         <button class="ibtn" id="bMute" aria-label="Sound">&#9834;</button>
+        <button class="ibtn" id="bList" aria-label="Show Gerald's order">&#128241;<span class="badge" id="listN"></span></button>
       </div>
     </div>
   </div>
@@ -323,7 +336,6 @@ function resize(){
   CH=Math.max(1,cv.clientHeight||window.innerHeight);
   var w=Math.round(CW*DPR), h=Math.round(CH*DPR);
   if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}
-  if(typeof refreshOrderRect==='function') refreshOrderRect();
 }
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',function(){setTimeout(resize,180);});
@@ -376,6 +388,7 @@ var SFX={
   coin:function(){beep(880,.06,'square',.12);setTimeout(function(){beep(1320,.09,'square',.1);},55);},
   good:function(){beep(523,.08,'triangle',.15);setTimeout(function(){beep(784,.13,'triangle',.13);},70);},
   cane:function(){noise(.16,.22);beep(140,.22,'sawtooth',.16,60);},
+  ping:function(){beep(880,.09,'sine',.06); setTimeout(function(){beep(1320,.15,'sine',.06);},95);},
   taser:function(){beep(1500,.1,'sawtooth',.1,220);},
   throw:function(){beep(400,.08,'triangle',.1,760);},
   free:function(){beep(659,.09,'triangle',.14);setTimeout(function(){beep(880,.09,'triangle',.13);},80);
@@ -711,7 +724,8 @@ function buildStore(){
 
   /* Gerald waits at the curb: a bright zone across the bottom-left. */
   W2.gerald={x:150,y:h-92,r:20,bob:0,mad:0};
-  W2.goal=aabb(70,h-150,220,110);
+  /* Roomy on purpose: this is where a 10-year-old stands to hand over a bag. */
+  W2.goal=aabb(52,h-176,268,142);
 
   /* Aisles: 4 columns x 2 blocks. Each shelf carries item spots on both faces. */
   var cols=4, rows=2, perShelf=8;
@@ -995,6 +1009,40 @@ function copsThisRound(){ return Math.max(1,Math.min(4,Math.floor(ROUND/2)+1)); 
 function guardsThisRound(){ return Math.max(1,Math.min(3,Math.floor((ROUND-1)/2)+1)); }
 function seniorsThisRound(){ return Math.min(8,2+Math.floor(ROUND*.9)); }
 
+/* True while Gerald's order is on screen and the world is held still, so the
+   pause key cannot fight it for the veil. */
+var ORDER_MODAL=false;
+function orderPopup(){
+  if(!ORDER) return;
+  ORDER_MODAL=true; paused=true;
+  SFX.ping();
+  var li='';
+  for(var i=0;i<ORDER.items.length;i++){
+    var it=ITEM[ORDER.items[i]];
+    li+='<li><span class="em">'+it.e+'</span>'+it.n+'</li>';
+  }
+  showVeil('<h2>&#128241; New order</h2>'+
+    '<div class="speech"><div class="face">&#128116;</div><div class="txt"><b>GERALD:</b> &ldquo;'+
+    ORDER.rant+'&rdquo;</div></div>'+
+    '<ul class="olist">'+li+'</ul>'+
+    '<p class="small">Tap &#128241; up top any time you forget.</p>'+
+    '<div class="rowbtns"><button class="btn go" id="oOk">GOT IT</button></div>');
+  on('oOk',function(){
+    ORDER_MODAL=false; hideVeil(); paused=false;
+    elOrder.classList.remove('open');   /* she just read it; leave Gerald in the clear */
+  });
+}
+function toggleList(){
+  if(PHASE!=='store'||!ORDER) return;
+  elOrder.classList.toggle('open');
+}
+function syncListBadge(){
+  var b=$('listN'); if(!b) return;
+  if(PHASE!=='store'||!ORDER){ b.textContent=''; return; }
+  var left=0;
+  for(var i=0;i<ORDER.got.length;i++) if(!ORDER.got[i]) left++;
+  b.textContent=left?String(left):'';
+}
 function newOrder(){
   /* Weight toward short orders early, longer ones later. */
   var maxLen = ROUND<4?2:3;
@@ -1005,6 +1053,7 @@ function newOrder(){
   PATMAX=Math.max(24, 46 - ROUND*2.2 + o.i.length*11);
   PATIENCE=PATMAX;
   renderOrder();
+  orderPopup();
 }
 
 function startPhase(ph){
@@ -2294,24 +2343,9 @@ var elHud=$('hud'), elHearts=$('hearts'), elCoin=$('coinN'), elRound=$('roundN')
     elMeterFl=$('meterFl'), elMeterLbl=$('meterLbl'), elVeil=$('veil'), elCard=$('veilCard'),
     elToasts=$('toasts'), elGrab=$('bGrab'), elWep=$('bWep'), elWepN=$('wepN');
 
-/* Cached because reading it back is a layout flush; the card only changes shape
-   when the order changes or the window resizes. */
-var orderRect=null;
-function refreshOrderRect(){
-  orderRect=(elOrder&&elOrder.style.display!=='none')?elOrder.getBoundingClientRect():null;
-}
-function duckOrderForGerald(){
-  if(!elOrder) return;
-  if(!orderRect||!W||!W.gerald||PHASE!=='store'){ elOrder.classList.remove('ducked'); return; }
-  var gx=(W.gerald.x-CAM.x)*CAM.sc, gy=(W.gerald.y-CAM.y)*CAM.sc;
-  var pad=52;   /* he is about this tall with the walker, and wider when dancing */
-  elOrder.classList.toggle('ducked',
-    gx>orderRect.left-pad&&gx<orderRect.right+pad&&
-    gy>orderRect.top-pad &&gy<orderRect.bottom+pad);
-}
 function syncHud(){
   if(!P) return;
-  duckOrderForGerald();
+  syncListBadge();
   /* Rebuilding this markup every tick tore down elements under the player's finger. */
   var sig=P.hp+'/'+P.maxhp+'/'+P.shield+'/'+cartMax()+'/'+P.cart.join(',')+'/'+
     (ORDER?ORDER.got.join(''):'');
@@ -2346,8 +2380,16 @@ function syncHudLight(){
   elWep.disabled=false;
   if(elDrop) elDrop.disabled=(P.cart.length===0);
   /* the one mechanic a first-timer has to guess: light the button when it will do something */
-  if(elGrab) elGrab.classList.toggle('hot',
-    SCENE==='play' && PHASE==='store' && ((atGerald()&&P.cart.length>0) || !!nearestSpot()));
+  if(elGrab){
+    var canDeliver=SCENE==='play'&&PHASE==='store'&&atGerald()&&P.cart.length>0;
+    elGrab.classList.toggle('hot',
+      SCENE==='play' && PHASE==='store' && (canDeliver || !!nearestSpot()));
+    /* It is the only thing that hands the bag to Gerald, so it has to say so.
+       Labelled GRAB, standing on his curb tapping it read as him ignoring her. */
+    var lbl=canDeliver?'DELIVER':'GRAB';
+    if(elGrab.textContent!==lbl) elGrab.textContent=lbl;
+    elGrab.classList.toggle('handover',canDeliver);
+  }
   var dashEl=$('bDash');
   if(dashEl){ dashEl.classList.toggle('hide',!P.up.dash); dashEl.classList.toggle('cool',P.dashcd>0); }
   /* meter */
@@ -2372,7 +2414,7 @@ function syncHudLight(){
   }
 }
 function renderOrder(){
-  if(PHASE!=='store'||!ORDER){ elOrder.style.display='none'; orderRect=null; return; }
+  if(PHASE!=='store'||!ORDER){ elOrder.style.display='none'; return; }
   elOrder.style.display='';
   var li='';
   for(var i=0;i<ORDER.items.length;i++){
@@ -2381,8 +2423,6 @@ function renderOrder(){
   }
   elOrder.innerHTML='<div class="who">📱 GERALD — order '+(ordersThisRound()-W.left+1)+'/'+ordersThisRound()+'</div>'+
     '<div class="rant">'+ORDER.rant+'</div><ul>'+li+'</ul>';
-  /* the card just changed height, so the cached rect is stale */
-  refreshOrderRect();
 }
 function toast(txt,cls){
   var d=document.createElement('div');
@@ -2413,6 +2453,7 @@ bindBtn(elGrab,function(){IN.grabEdge=true;},null);
 bindBtn($('bDrop'),function(){ dropSmart(); },null);
 bindBtn($('bDash'),function(){ IN.dashEdge=true; },null);
 $('bPause').addEventListener('click',function(){auInit();togglePause();});
+$('bList').addEventListener('click',function(e){e.preventDefault();auInit();toggleList();});
 $('bMute').addEventListener('click',function(){
   AU.on=!AU.on; LS.set('cm_snd',AU.on?'1':'0');
   $('bMute').style.color=AU.on?'':'#5a4f80';
@@ -2449,6 +2490,7 @@ function howto(back){
     '<h2>How to play</h2>'+
     '<div class="help">'+
       '<div><span class="k">MOVE</span><span>Touch anywhere and drag. She walks toward your finger. Or WASD / arrow keys.</span></div>'+
+      '<div><span class="k">&#128241;</span><span>Gerald texts each order. Tap the phone up top to read it again -- the number on it is how many items you still need.</span></div>'+
       '<div><span class="k">GRAB</span><span>Big yellow button, or SPACE. Takes the item you are standing next to. At Gerald’s curb it hands over the bag.</span></div>'+
       '<div><span class="k">THROW</span><span>Blue button, or J. Throws candy. <b>Long-press</b> it (or Q) to switch treat.</span></div>'+
       '<div><span class="k">DROP</span><span>Tap the DROP button to put a wrong item back. Free. Do it.</span></div>'+
@@ -2546,7 +2588,7 @@ function showPauseCard(){
 }
 var paused=false;
 function togglePause(){
-  if(SCENE!=='play') return;
+  if(SCENE!=='play'||ORDER_MODAL) return;
   paused=!paused;
   if(paused) showPauseCard(); else hideVeil();
 }
