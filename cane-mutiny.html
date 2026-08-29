@@ -136,6 +136,10 @@ body{
 .order li{display:flex;align-items:center;gap:6px;font-size:clamp(11px,3.2vw,13px);line-height:1.1}
 .order li .em{font-size:16px;line-height:1}
 .order li.done{color:var(--good);text-decoration:line-through;opacity:.75}
+/* it drops out of the way when it would cover Gerald -- you have to be able to
+   watch him take the cane to you, and watch him dance when you get it right */
+.order{transition:opacity .16s ease}
+.order.ducked{opacity:.07}
 
 /* cart */
 .cart{display:flex;gap:5px;pointer-events:none;justify-content:flex-end;flex-wrap:wrap;
@@ -319,6 +323,7 @@ function resize(){
   CH=Math.max(1,cv.clientHeight||window.innerHeight);
   var w=Math.round(CW*DPR), h=Math.round(CH*DPR);
   if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}
+  if(typeof refreshOrderRect==='function') refreshOrderRect();
 }
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',function(){setTimeout(resize,180);});
@@ -1870,18 +1875,34 @@ function drawPlayer(){
   }
   if(P.dashing>0){ ctx.fillStyle='rgba(75,200,255,.35)';
     ctx.beginPath(); ctx.arc(P.x-P.vx*.03,P.y-P.vy*.03,P.r,0,TAU); ctx.fill(); }
-  /* legs */
+  /* legs -- shorter than they were, because they come out from under a skirt */
   ctx.strokeStyle='#2d2450'; ctx.lineWidth=4.5; ctx.lineCap='round';
   var lw=Math.sin(P.walk)*5;
-  ctx.beginPath(); ctx.moveTo(P.x-4,P.y+7); ctx.lineTo(P.x-4+lw,P.y+16);
-  ctx.moveTo(P.x+4,P.y+7); ctx.lineTo(P.x+4-lw,P.y+16); ctx.stroke();
-  /* body: courier vest, or a truly loud shirt */
+  ctx.beginPath(); ctx.moveTo(P.x-4,P.y+9); ctx.lineTo(P.x-4+lw,P.y+17);
+  ctx.moveTo(P.x+4,P.y+9); ctx.lineTo(P.x+4-lw,P.y+17); ctx.stroke();
+  /* hair, behind the head so the face sits on top of it */
+  ctx.fillStyle='#5b3a29';
+  ctx.beginPath(); ctx.arc(P.x,P.y-15+bob,10.5,0,TAU); ctx.fill();
+  /* ponytail, swinging against the stride */
+  ctx.beginPath();
+  ctx.ellipse(P.x-P.face*10,P.y-12+bob+Math.sin(P.walk)*1.8,4.4,7.6,-P.face*.45,0,TAU);
+  ctx.fill();
+  /* the dress: shoulders in, hem out */
   ctx.fillStyle=P.up.shirt?'#ff7ab0':'#4bc8ff';
-  rr(ctx,P.x-10,P.y-8+bob*.3,20,18*sq,6); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(P.x-9,P.y-8+bob*.3); ctx.lineTo(P.x+9,P.y-8+bob*.3);
+  ctx.lineTo(P.x+14,P.y+10*sq); ctx.lineTo(P.x-14,P.y+10*sq);
+  ctx.closePath(); ctx.fill();
+  /* a lighter band at the waist so the skirt reads as a skirt */
+  ctx.fillStyle='rgba(255,255,255,.22)';
+  rr(ctx,P.x-9.5,P.y-1+bob*.3,19,3.5,1.6); ctx.fill();
   if(P.up.shirt){ ctx.fillStyle='#ffe066';
-    for(var f=0;f<3;f++){ ctx.beginPath(); ctx.arc(P.x-6+f*6,P.y-2+bob*.3,2.4,0,TAU); ctx.fill(); } }
+    for(var f=0;f<3;f++){ ctx.beginPath(); ctx.arc(P.x-6+f*6,P.y+5+bob*.3,2.4,0,TAU); ctx.fill(); } }
   /* head */
   ctx.fillStyle='#ffd9b0'; ctx.beginPath(); ctx.arc(P.x,P.y-15+bob,9,0,TAU); ctx.fill();
+  /* a fringe, so she is not bald under the cap */
+  ctx.fillStyle='#5b3a29';
+  ctx.beginPath(); ctx.arc(P.x,P.y-17+bob,9.2,Math.PI*1.08,TAU*.99); ctx.fill();
   /* hat or wig */
   if(P.up.wig){ ctx.fillStyle='#e8e4f2'; ctx.beginPath(); ctx.arc(P.x,P.y-18+bob,10.5,Math.PI,TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(P.x-9,P.y-15+bob,4.5,0,TAU); ctx.arc(P.x+9,P.y-15+bob,4.5,0,TAU); ctx.fill(); }
@@ -2273,8 +2294,24 @@ var elHud=$('hud'), elHearts=$('hearts'), elCoin=$('coinN'), elRound=$('roundN')
     elMeterFl=$('meterFl'), elMeterLbl=$('meterLbl'), elVeil=$('veil'), elCard=$('veilCard'),
     elToasts=$('toasts'), elGrab=$('bGrab'), elWep=$('bWep'), elWepN=$('wepN');
 
+/* Cached because reading it back is a layout flush; the card only changes shape
+   when the order changes or the window resizes. */
+var orderRect=null;
+function refreshOrderRect(){
+  orderRect=(elOrder&&elOrder.style.display!=='none')?elOrder.getBoundingClientRect():null;
+}
+function duckOrderForGerald(){
+  if(!elOrder) return;
+  if(!orderRect||!W||!W.gerald||PHASE!=='store'){ elOrder.classList.remove('ducked'); return; }
+  var gx=(W.gerald.x-CAM.x)*CAM.sc, gy=(W.gerald.y-CAM.y)*CAM.sc;
+  var pad=52;   /* he is about this tall with the walker, and wider when dancing */
+  elOrder.classList.toggle('ducked',
+    gx>orderRect.left-pad&&gx<orderRect.right+pad&&
+    gy>orderRect.top-pad &&gy<orderRect.bottom+pad);
+}
 function syncHud(){
   if(!P) return;
+  duckOrderForGerald();
   /* Rebuilding this markup every tick tore down elements under the player's finger. */
   var sig=P.hp+'/'+P.maxhp+'/'+P.shield+'/'+cartMax()+'/'+P.cart.join(',')+'/'+
     (ORDER?ORDER.got.join(''):'');
@@ -2335,7 +2372,7 @@ function syncHudLight(){
   }
 }
 function renderOrder(){
-  if(PHASE!=='store'||!ORDER){ elOrder.style.display='none'; return; }
+  if(PHASE!=='store'||!ORDER){ elOrder.style.display='none'; orderRect=null; return; }
   elOrder.style.display='';
   var li='';
   for(var i=0;i<ORDER.items.length;i++){
@@ -2344,6 +2381,8 @@ function renderOrder(){
   }
   elOrder.innerHTML='<div class="who">📱 GERALD — order '+(ordersThisRound()-W.left+1)+'/'+ordersThisRound()+'</div>'+
     '<div class="rant">'+ORDER.rant+'</div><ul>'+li+'</ul>';
+  /* the card just changed height, so the cached rect is stale */
+  refreshOrderRect();
 }
 function toast(txt,cls){
   var d=document.createElement('div');
