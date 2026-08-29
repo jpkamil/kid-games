@@ -2491,7 +2491,9 @@ function startGame(){
    MAIN LOOP
    ==========================================================================*/
 var last=0;
+var framesDrawn=0;
 function step(ts){
+  framesDrawn++;
   var dt=(ts-last)/1000; last=ts;
   if(!(dt>0)||dt>.25) dt=1/60;
   try{
@@ -2503,7 +2505,7 @@ function step(ts){
     /* A bad frame must not be a dead game: log once, keep the loop alive. */
     if(!window.__cmErr){ window.__cmErr=(e&&e.message)||'error'; if(window.console) console.error(e); }
   }
-  raf(step);
+  if(!window.__cmDrive) raf(step);
 }
 /* One tick of the world. Split out from step() so it can be driven headlessly. */
 function simulate(dt){
@@ -2556,4 +2558,16 @@ $('bMute').textContent=AU.on?'♪':'✖';
 menu();
 last=(window.performance&&performance.now)?performance.now():Date.now();
 raf(step);
+/* iOS Low Power Mode (and some embedded webviews) suspend requestAnimationFrame
+   outright -- the function still exists, so the "is rAF missing?" fallback above
+   never fires. If not one frame lands while the page is visible, drive from a timer. */
+window.__cmDrive=false;
+setTimeout(function(){
+  if(framesDrawn>0 || document.visibilityState!=='visible') return;
+  window.__cmDrive=true;
+  setInterval(function(){
+    if(document.visibilityState==='visible')
+      step((window.performance&&performance.now)?performance.now():Date.now());
+  },33);
+},900);
 </script>
