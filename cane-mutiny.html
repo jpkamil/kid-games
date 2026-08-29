@@ -298,6 +298,8 @@ body{
 var TAU=Math.PI*2;
 function clamp(v,a,b){return v<a?a:(v>b?b:v);}
 function lerp(a,b,t){return a+(b-a)*t;}
+function es(u){return u<0?0:u>1?1:u*u*(3-2*u);}   /* smoothstep, for the cane */
+var SWING_T=.52, SW_UP=.30, SW_DN=.56;            /* windup / slam / settle */
 function rnd(a,b){return a+Math.random()*(b-a);}
 function rndi(a,b){return Math.floor(rnd(a,b+1));}
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
@@ -1565,7 +1567,8 @@ function deliver(){
   }
   if(wrong){
     STATS.wrong+=wrong;
-    W.gerald.mad=.9; SFX.cane(); shake(14); flash(.45,'#ff4d5e');
+    W.gerald.mad=.9; W.gerald.swing=SWING_T; SFX.cane(); shake(14); flash(.45,'#ff4d5e');
+    pop(P.x,P.y-24,'WHACK!','#ff4d5e');
     geraldSays(pick(CANE_LINES));
     /* the cane only lands once per delivery, however wrong you were */
     hurtPlayer(1,null);
@@ -2000,6 +2003,16 @@ function drawGerald(){
   var dancing=g.dance>0;
   var hop=dancing?Math.abs(Math.sin(t*11))*13:Math.sin(g.bob*1.6)*1.5;
   var lean=dancing?Math.sin(t*9)*.35:(g.mad>0?-.3:0);
+  /* 0..1 through a cane swing, or -1 when he is not swinging one */
+  var sw=g.swing>0?1-g.swing/SWING_T:-1;
+  if(sw>=0){
+    /* up on his toes for the windup, then his whole body goes into it */
+    if(sw<SW_UP){      hop+=es(sw/SW_UP)*4;              lean=lerp(0,-.38,es(sw/SW_UP)); }
+    else if(sw<SW_DN){ hop+=lerp(4,-2,es((sw-SW_UP)/(SW_DN-SW_UP)));
+                       lean=lerp(-.38,.32,es((sw-SW_UP)/(SW_DN-SW_UP))); }
+    else {             hop+=lerp(-2,0,es((sw-SW_DN)/(1-SW_DN)));
+                       lean=lerp(.32,0,es((sw-SW_DN)/(1-SW_DN))); }
+  }
   /* the walker, abandoned when the music takes him */
   ctx.strokeStyle='#9aa3c0'; ctx.lineWidth=4; ctx.lineCap='round';
   var wx=g.x+(dancing?26:0), wy=g.y+(dancing?4:0);
@@ -2026,8 +2039,24 @@ function drawGerald(){
   else if(g.mad>0) ctx.arc(0,-14,4.6,Math.PI,TAU);
   else { ctx.moveTo(-4,-16); ctx.lineTo(4,-16); }
   ctx.stroke();
-  /* the cane */
-  var ca=dancing?Math.sin(t*11)*1.5-0.7:(g.mad>0?-1.35+Math.sin(t*26)*.5:0.35);
+  /* The cane. It is a policy, so it has to look like one: he winds it up over
+     his head, brings it down fast, then lets it settle. Charlotte's note was
+     that it never looked like he actually hit her -- it was only a screen
+     shake and a sound, and he never moved. */
+  var ca;
+  if(sw>=0){
+    if(sw<SW_UP)      ca=lerp(0.35,-2.35,es(sw/SW_UP));
+    else if(sw<SW_DN) ca=lerp(-2.35,1.25,es((sw-SW_UP)/(SW_DN-SW_UP)));
+    else              ca=lerp(1.25,0.35,es((sw-SW_DN)/(1-SW_DN)));
+  }
+  else ca=dancing?Math.sin(t*11)*1.5-0.7:(g.mad>0?-1.35+Math.sin(t*26)*.5:0.35);
+  /* the arc the tip cut through the air, while it is coming down */
+  if(sw>=SW_UP&&sw<SW_DN+.10){
+    ctx.save(); ctx.translate(13,-6);
+    ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(0,0,27,-2.35+Math.PI/2,ca+Math.PI/2); ctx.stroke();
+    ctx.restore();
+  }
   ctx.save(); ctx.translate(13,-6); ctx.rotate(ca);
   ctx.strokeStyle='#6b4423'; ctx.lineWidth=4.5; ctx.beginPath();
   ctx.moveTo(0,0); ctx.lineTo(0,26); ctx.stroke();
@@ -2551,6 +2580,7 @@ function simulate(dt){
   {
     W.time+=dt;
     if(W.gerald){ if(W.gerald.mad>0) W.gerald.mad-=dt;
+                  if(W.gerald.swing>0) W.gerald.swing-=dt;
                   if(W.gerald.say>0) W.gerald.say-=dt;
                   if(W.gerald.dance>0) W.gerald.dance-=dt; }
     if(P.buff.rampage>0&&P.buff.rampage-dt<=0){ P.rampChain=0; toast('back to normal. run.','bad'); }
@@ -2562,7 +2592,7 @@ function simulate(dt){
     if(PHASE==='store'&&ORDER){
       PATIENCE-=dt*(atGerald()?.35:1);
       if(PATIENCE<=0){
-        PATIENCE=PATMAX*.8; W.gerald.mad=1; SFX.cane(); shake(10);
+        PATIENCE=PATMAX*.8; W.gerald.mad=1; W.gerald.swing=SWING_T; SFX.cane(); shake(10);
         geraldSays(pick(HURRY_LINES)); hurtPlayer(1,'TOO SLOW. THE CANE FINDS YOU ANYWAY.');
       }
     }
