@@ -387,7 +387,7 @@ var IN={
   grab:false, grabEdge:false,
   fire:false, fireEdge:false,
   dashEdge:false,
-  keys:{}, touch:null, aimx:1, aimy:0
+  keys:{}, touch:null, pts:{}, aimx:1, aimy:0
 };
 window.addEventListener('keydown',function(e){
   var k=(e.key||'').toLowerCase(); if(!k) return;
@@ -404,7 +404,7 @@ window.addEventListener('keydown',function(e){
   auInit();
 });
 window.addEventListener('keyup',function(e){ IN.keys[(e.key||'').toLowerCase()]=false; });
-window.addEventListener('blur',function(){ IN.keys={}; IN.touch=null; IN.ax=IN.ay=0; });
+window.addEventListener('blur',function(){ IN.keys={}; IN.touch=null; IN.pts={}; IN.ax=IN.ay=0; });
 
 function readKeys(){
   var x=0,y=0,K=IN.keys;
@@ -428,17 +428,32 @@ var STEER_FULL=72;   /* finger this far from her = full speed */
 var STEER_DEAD=13;   /* this close = stand still, so a tap does not jitter her */
 cv.addEventListener('pointerdown',function(e){
   auInit();
-  cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+  /* Capture is a nicety -- it keeps a finger that slides off the canvas still
+     steering. It must never be able to take movement down with it, so it goes
+     after the state it would otherwise skip, in its own try. */
+  IN.pts[e.pointerId]={x:e.clientX,y:e.clientY};
   IN.touch={id:e.pointerId,x:e.clientX,y:e.clientY};
+  try{ cv.setPointerCapture&&cv.setPointerCapture(e.pointerId); }catch(err){}
   e.preventDefault();
 },{passive:false});
 cv.addEventListener('pointermove',function(e){
-  if(!IN.touch||IN.touch.id!==e.pointerId) return;
-  IN.touch.x=e.clientX; IN.touch.y=e.clientY;
+  var pt=IN.pts[e.pointerId]; if(!pt) return;
+  pt.x=e.clientX; pt.y=e.clientY;
+  if(IN.touch&&IN.touch.id===e.pointerId){ IN.touch.x=e.clientX; IN.touch.y=e.clientY; }
   e.preventDefault();
 },{passive:false});
+/* Every finger on the glass is tracked, not just the newest. A kid steering with
+   her thumb and missing the GRAB button with her other hand used to orphan the
+   thumb that was actually driving -- she froze mid-chase with her finger still
+   down, which reads as the game hanging. Steering hands back to whichever finger
+   is still there. */
 function endStick(e){
-  if(IN.touch&&IN.touch.id===e.pointerId){ IN.touch=null; IN.ax=0; IN.ay=0; }
+  delete IN.pts[e.pointerId];
+  if(IN.touch&&IN.touch.id===e.pointerId){
+    IN.touch=null;
+    for(var id in IN.pts){ IN.touch={id:+id,x:IN.pts[id].x,y:IN.pts[id].y}; break; }
+    if(!IN.touch){ IN.ax=0; IN.ay=0; }
+  }
 }
 cv.addEventListener('pointerup',endStick);
 cv.addEventListener('pointercancel',endStick);
@@ -1305,6 +1320,17 @@ function updateSeniors(dt){
     var s=W.seniors[i];
     s.wob+=dt*3; if(s.say>0) s.say-=dt;
     if(s.freed) continue;
+
+    /* Nobody may want a snack she cannot produce. makeSenior picks want from
+       every lure she OWNS, but only candy and cake get restocked here -- so a
+       player who bought the bazooka and ran the cat food dry got residents
+       demanding cat food with no way to buy more until after the escape, and
+       the phase simply never ended. If her bag is dry of what he wants, he
+       changes his mind. */
+    if((P.ammo[s.want]||0)<=0){
+      var have=[]; for(var lk in LURES) if(P.wep[lk]&&(P.ammo[lk]||0)>0) have.push(lk);
+      if(have.length&&have.indexOf(s.want)<0) s.want=pick(have);
+    }
 
     if(s.st==='wander'){
       if(!s.wp||dist2(s.x,s.y,s.wp.x,s.wp.y)<800||s.stuck>1.6){
@@ -2357,7 +2383,7 @@ function howto(back){
       '<div><span class="k">MOVE</span><span>Touch anywhere and drag. She walks toward your finger. Or WASD / arrow keys.</span></div>'+
       '<div><span class="k">GRAB</span><span>Big yellow button, or SPACE. Takes the item you are standing next to. At Gerald’s curb it hands over the bag.</span></div>'+
       '<div><span class="k">THROW</span><span>Blue button, or J. Throws candy. <b>Long-press</b> it (or Q) to switch treat.</span></div>'+
-      '<div><span class="k">DROP</span><span>Tap a bag slot to put a wrong item back. Free. Do it.</span></div>'+
+      '<div><span class="k">DROP</span><span>Tap the DROP button to put a wrong item back. Free. Do it.</span></div>'+
       '<div><span class="k">1</span><span><b>Grumble-Mart.</b> Read the order. Get exactly those items. Wrong item = cane.</span></div>'+
       '<div><span class="k">2</span><span><b>Shady Pines.</b> Throw the treat each resident is thinking about, then lead the conga line to the gate.</span></div>'+
       '<div><span class="k">3</span><span><b>The Escape.</b> Run right. Do not get hit by a cart, a sprinkler or a bingo ball.</span></div>'+
