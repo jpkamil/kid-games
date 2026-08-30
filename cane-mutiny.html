@@ -635,6 +635,16 @@ var SHOP=[
   {k:'d_dash',  t:'up', ttl:'Rocket Slippers',  e:'👘', pr:90, ds:'Dash on the DASH button. Brief invincibility.', give:function(){P.up.dash=true;}}
 ];
 
+/* Two ways to play. Beginner is the default, because the first thing anyone does
+   is lose, and the point is to get far enough in to meet the jokes. Normal is the
+   game as tuned. Nothing here changes what is possible -- only the pressure. */
+var DIFFS={
+  beginner:{n:'BEGINNER',foeSpd:.76,foeCd:1.5,patience:1.4,foes:.6,hp:6,lure:1.3},
+  normal:  {n:'NORMAL',  foeSpd:1,  foeCd:1,   patience:1,  foes:1,  hp:5,lure:1}
+};
+var DIFF=DIFFS[LS.get('cm_diff')==='normal'?'normal':'beginner'];
+function setDiff(k){ DIFF=DIFFS[k]||DIFFS.beginner; LS.set('cm_diff',k); }
+
 /* The Pac-Man pellet. Three flavours, same result: the guards start running. */
 var TREATS=[
   {e:'🧋', cry:'BOBA POWER!'},
@@ -668,7 +678,7 @@ var STATS=null;
 function newPlayer(){
   return {
     x:0,y:0,vx:0,vy:0,r:13,face:1,walk:0,aimx:1,aimy:0,rampMax:20,rampChain:0,
-    hp:5,maxhp:5,shield:0,iframe:0,
+    hp:DIFF.hp,maxhp:DIFF.hp,shield:0,iframe:0,
     cart:[], wep:{candy:true,cake:true,catfood:false,juice:false,bingo:false}, wepi:0,
     ammo:{candy:12,cake:8,catfood:0,juice:0,bingo:0},
     up:{shoes:false,cargo:false,shirt:false,wig:false,lid:false,dash:false,triple:false},
@@ -785,6 +795,15 @@ function buildHome(){
   W2.decor.push({t:'fountain',x:760,y:600,r:44});
   W2.walls.push(aabb(760-40,600-40,80,80));
 
+  /* Two treats, in far corners, same as the store. The orderlies are the reason
+     you want one: for twenty seconds they run from you instead. */
+  var pelH=[[w-200,110],[130,h-160],[w-180,h-140],[150,150]];
+  shuffle(pelH);
+  for(var pH=0;pH<2;pH++){
+    var trH=pick(TREATS);
+    W2.pickups.push({t:'pellet',x:pelH[pH][0],y:pelH[pH][1],r:20,bob:rnd(0,6),e:trH.e,cry:trH.cry});
+  }
+
   /* the gate: bring the confused here */
   W2.goal=aabb(w-150,h/2-110,120,220);
   W2.decor.push({t:'gate',r:W2.goal});
@@ -835,6 +854,7 @@ function makeFoe(t,x,y){
   if(t==='zomcop'){ f.spd=52; f.r=16; }
   if(t==='guard'){ f.spd=74; f.r=16; f.vis=210; f.cone=0.85; f.cd=rnd(.4,1.4); }
   if(t==='nurse'){ f.spd=96; f.r=15; f.vis=180; f.cone=1.0; f.cd=rnd(.6,1.6); }
+  f.spd*=DIFF.foeSpd; f.cd*=DIFF.foeCd;
   return f;
 }
 function patrolFor(f,world){
@@ -1050,7 +1070,7 @@ function newOrder(){
   if(!pool.length) pool=ORDERS;
   var o=pick(pool);
   ORDER={items:o.i.slice(),got:o.i.map(function(){return false;}),rant:o.r};
-  PATMAX=Math.max(24, 46 - ROUND*2.2 + o.i.length*11);
+  PATMAX=Math.max(24, 46 - ROUND*2.2 + o.i.length*11)*DIFF.patience;
   PATIENCE=PATMAX;
   renderOrder();
   orderPopup();
@@ -1072,7 +1092,7 @@ function startPhase(ph){
     P.ammo.cake=Math.max(P.ammo.cake,ns+3);
     for(var s=0;s<ns;s++) W.seniors.push(makeSenior(W));
     W.left=ns;
-    var ng2=Math.min(5,2+Math.floor(ROUND*.7));
+    var ng2=Math.max(1,Math.round(Math.min(5,2+Math.floor(ROUND*.7))*DIFF.foes));
     for(var g2=0;g2<ng2;g2++){ var f2=makeFoe(Math.random()<.35?'nurse':'guard',rnd(300,W.w-200),rnd(120,W.h-160)); patrolFor(f2,W); W.foes.push(f2); }
   }
   if(ph==='escape'){ W=buildEscape(); P.x=90; P.y=W.h/2; W.left=1; }
@@ -1330,7 +1350,7 @@ function updateFoes(dt){
         f.walk+=dt*6;
         f.cd-=dt;
         if(f.cd<=0&&canSee(f.x,f.y,P.x,P.y,W)){
-          f.cd=Math.max(.75,1.9-ROUND*.09);
+          f.cd=Math.max(.75,1.9-ROUND*.09)*DIFF.foeCd;
           W.shots.push({t:'taser',x:f.x,y:f.y,vx:Math.cos(f.ang)*330,vy:Math.sin(f.ang)*330,r:6,life:1.5,foe:true});
           SFX.taser();
           /* a spark off the muzzle, and he announces himself, because he would */
@@ -1386,7 +1406,7 @@ function updateSeniors(dt){
   /* How close a dropped snack has to land before he notices it. 95 was about a
      quarter of a phone screen, with nothing on screen to say so, so a throw that
      looked fine did nothing and the whole phase read as broken. */
-  var wigR=P.up.wig?300:165;
+  var wigR=(P.up.wig?300:165)*DIFF.lure;
   for(var i=W.seniors.length-1;i>=0;i--){
     var s=W.seniors[i];
     s.wob+=dt*3; if(s.say>0) s.say-=dt;
@@ -2380,7 +2400,7 @@ function drawShots(){
       /* The real reach of the smell, drawn so you can see whether you threw it
          close enough -- and so "he ignored it" stops being a mystery. */
       if(PHASE==='home'){
-        var rr2=(P.up.wig?300:165);
+        var rr2=(P.up.wig?300:165)*DIFF.lure;
         ctx.strokeStyle='rgba(140,227,79,'+(.20+pu*.16)+')';
         ctx.lineWidth=2.5; ctx.setLineDash([9,11]);
         ctx.beginPath(); ctx.arc(s.x,s.y,rr2,0,TAU); ctx.stroke();
@@ -2689,9 +2709,15 @@ function menu(){
       '<button class="btn go" id="mPlay">PLAY</button>'+
       '<button class="btn ghost" id="mHow">HOW TO PLAY</button>'+
     '</div>'+
+    '<div class="rowbtns" style="margin-top:10px">'+
+      '<button class="btn ghost" id="mDiff">MODE: '+DIFF.n+'</button>'+
+    '</div>'+
+    '<p class="small">Beginner gives you an extra heart, slower orderlies, more '+
+    'patience from Gerald, and snacks he can smell from further away.</p>'+
     '<div class="tag" style="margin-top:12px">Best purse: <b style="color:var(--sun)">'+BEST+'</b> coins</div>'
   );
   on('mPlay',function(){ startGame(); });
+  on('mDiff',function(){ setDiff(DIFF===DIFFS.beginner?'normal':'beginner'); menu(); });
   on('mHow',function(){ howto(); });
 }
 function howto(back){
@@ -2706,7 +2732,7 @@ function howto(back){
       '<div><span class="k">1</span><span><b>Grumble-Mart.</b> Read the order. Get exactly those items. Wrong item = cane.</span></div>'+
       '<div><span class="k">2</span><span><b>Shady Pines.</b> Throw the treat each resident is thinking about, then lead the conga line to the gate.</span></div>'+
       '<div><span class="k">3</span><span><b>The Escape.</b> Run right. Do not get hit by a cart, a sprinkler or a bingo ball.</span></div>'+
-      '<div><span class="k">🥤</span><span><b>Treat = rampage.</b> Boba, energy drink or ice cream in the store. For 20 seconds the guards run from <i>you</i>. Touch one to eject him. Chain them for double coins.</span></div>'+
+      '<div><span class="k">🥤</span><span><b>Treat = rampage.</b> Boba, energy drink or ice cream \u2014 two in the store, two in Shady Pines. For 20 seconds the guards and the taser orderlies run from <i>you</i>. Touch one to eject him. Chain them for double coins.</span></div>'+
       '<div><span class="k">💀</span><span>Out of hearts = you go to jail = game over. Start again.</span></div>'+
     '</div>'+
     '<div class="rowbtns"><button class="btn go" id="hBack">GOT IT</button></div>'
