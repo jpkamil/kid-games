@@ -1503,8 +1503,38 @@ function cycleWeapon(){
   var o=ownedWeps(); if(o.length<2) return;
   P.wepi=(P.wepi+1)%o.length; SFX.grab(); syncHud();
 }
+/* In Shady Pines the snack picks itself.
+   Each resident wants one particular thing and holds it up in a bubble -- but the
+   only way to change what you were throwing was a 380ms press-and-hold on the
+   weapon button, and a tap on that button throws. So a kid stood there pelting
+   candy at a man asking for cake, with the cake already in her bag, and no way to
+   find out. The bubble is the instruction; the game should just honour it.
+   Only ever swaps between LURES, so choosing an actual weapon still sticks. */
+function lureFor(){
+  if(PHASE!=='home'||!W||!W.seniors) return null;
+  var best=null, bd=1e9, ax=P.aimx||1, ay=P.aimy||0;
+  for(var i=0;i<W.seniors.length;i++){
+    var s=W.seniors[i];
+    if(s.freed||s.st==='follow') continue;
+    var dx=s.x-P.x, dy=s.y-P.y, d=Math.max(1,Math.hypot(dx,dy));
+    if(d>460) continue;
+    var dot=(dx*ax+dy*ay)/d;          /* only ones she is roughly facing */
+    if(dot<0.2) continue;
+    var score=d*(1.7-dot);
+    if(score<bd){ bd=score; best=s; }
+  }
+  if(!best) return null;
+  var w=best.want;
+  return (P.wep[w]&&P.ammo[w]>0)?w:null;
+}
+/* What the next throw will actually be. The button shows this, so it is never a
+   surprise -- she sees the cake on the button before she throws the cake. */
+function nextThrow(){
+  var cur=curWep();
+  return (LURES[cur]?lureFor():null)||cur;
+}
 function doThrow(){
-  var w=curWep(); if(P.ammo[w]<=0){ toast('OUT OF '+WEPNAME[w],'bad'); beep(180,.12,'square',.1); return; }
+  var w=nextThrow(); if(P.ammo[w]<=0){ toast('OUT OF '+WEPNAME[w],'bad'); beep(180,.12,'square',.1); return; }
   P.ammo[w]--; SFX.throw(); STATS.thrown++;
   var ax=P.aimx||1, ay=P.aimy||0;
   var n=(w==='candy'&&P.up.triple)?3:1;
@@ -2603,8 +2633,8 @@ function syncHudLight(){
   elRound.textContent=ROUND;
   elPhase.textContent=PHASE==='store'?'Grumble-Mart':(PHASE==='home'?'Shady Pines':'The Escape');
   {
-  /* weapon button */
-  var w=curWep();
+  /* weapon button -- shows the snack that will actually leave her hand */
+  var w=nextThrow();
   elWep.innerHTML=WEPEMO[w]+'<span class="n">'+P.ammo[w]+'</span>';
   elWep.disabled=false;
   if(elDrop) elDrop.disabled=(P.cart.length===0);
@@ -2732,7 +2762,7 @@ function howto(back){
       '<div><span class="k">1</span><span><b>Grumble-Mart.</b> Read the order. Get exactly those items. Wrong item = cane.</span></div>'+
       '<div><span class="k">2</span><span><b>Shady Pines.</b> Throw the treat each resident is thinking about, then lead the conga line to the gate.</span></div>'+
       '<div><span class="k">3</span><span><b>The Escape.</b> Run right. Do not get hit by a cart, a sprinkler or a bingo ball.</span></div>'+
-      '<div><span class="k">🥤</span><span><b>Treat = rampage.</b> Boba, energy drink or ice cream \u2014 two in the store, two in Shady Pines. For 20 seconds the guards and the taser orderlies run from <i>you</i>. Touch one to eject him. Chain them for double coins.</span></div>'+
+      '<div><span class="k">🥤</span><span><b>Snacks aim themselves.</b> In Shady Pines the button shows whatever the nearest resident is asking for, so just point at him and throw.</span></div>'+      '<div><span class="k">\ud83e\uddcb</span><span><b>Treat = rampage.</b> Boba, energy drink or ice cream \u2014 two in the store, two in Shady Pines. For 20 seconds the guards and the taser orderlies run from <i>you</i>. Touch one to eject him. Chain them for double coins.</span></div>'+
       '<div><span class="k">💀</span><span>Out of hearts = you go to jail = game over. Start again.</span></div>'+
     '</div>'+
     '<div class="rowbtns"><button class="btn go" id="hBack">GOT IT</button></div>'
