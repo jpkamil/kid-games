@@ -145,6 +145,25 @@ body{
   background:var(--sun);color:#231a3d;font-size:10px;font-weight:700;
   display:grid;place-items:center;padding:0 3px;font-family:'Roboto Mono',monospace}
 .badge:empty{display:none}
+/* the difficulty slider on the menu */
+.diffbox{margin-top:14px;background:rgba(10,8,18,.5);border:1px solid var(--edge);
+  border-radius:14px;padding:12px 14px 11px}
+.diffbox input[type=range]{-webkit-appearance:none;appearance:none;width:100%;
+  height:26px;background:transparent;touch-action:manipulation;display:block}
+.diffbox input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:99px;
+  background:linear-gradient(90deg,var(--good),var(--sun),var(--hot))}
+.diffbox input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:26px;height:26px;border-radius:50%;background:#fff4e6;border:3px solid var(--void2);
+  box-shadow:0 3px 10px rgba(0,0,0,.5);margin-top:-9px}
+.diffbox input[type=range]::-moz-range-track{height:8px;border-radius:99px;
+  background:linear-gradient(90deg,var(--good),var(--sun),var(--hot))}
+.diffbox input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
+  background:#fff4e6;border:3px solid var(--void2)}
+.diffends{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.09em;margin-top:1px}
+.difflbl{text-align:center;font-family:'Luckiest Guy',cursive;letter-spacing:.03em;
+  font-size:17px;color:var(--sun);margin-top:8px}
+.diffdesc{text-align:center;font-size:12px;line-height:1.3;color:var(--dim);margin-top:3px}
 /* the order as it arrives, in the popup */
 .olist{list-style:none;display:flex;flex-direction:column;gap:7px;margin:11px 0 3px;
   background:rgba(10,8,18,.5);border:1px solid var(--edge);border-radius:12px;padding:11px 13px}
@@ -638,12 +657,20 @@ var SHOP=[
 /* Two ways to play. Beginner is the default, because the first thing anyone does
    is lose, and the point is to get far enough in to meet the jokes. Normal is the
    game as tuned. Nothing here changes what is possible -- only the pressure. */
-var DIFFS={
-  beginner:{n:'BEGINNER',foeSpd:.76,foeCd:1.5,patience:1.4,foes:.6,hp:6,lure:1.3},
-  normal:  {n:'NORMAL',  foeSpd:1,  foeCd:1,   patience:1,  foes:1,  hp:5,lure:1}
-};
-var DIFF=DIFFS[LS.get('cm_diff')==='normal'?'normal':'beginner'];
-function setDiff(k){ DIFF=DIFFS[k]||DIFFS.beginner; LS.set('cm_diff',k); }
+var LEVELS=[
+  {n:'MILD', p:1, d:'Learning the rules. Everyone wants candy, the orderlies are slow, and you get an extra heart.',
+   foeSpd:.70,foeCd:1.7,patience:1.5,foes:.55,hp:6,lure:1.35,wants:'candy'},
+  {n:'MEDIUM', p:2, d:'Still all candy, but they move like they mean it.',
+   foeSpd:.85,foeCd:1.3,patience:1.2,foes:.8, hp:6,lure:1.15,wants:'candy'},
+  {n:'HOT', p:3, d:'Now they each want a different snack. Watch the bubbles.',
+   foeSpd:1,  foeCd:1,   patience:1,  foes:1,  hp:5,lure:1,   wants:'all'},
+  {n:'THAI HOT', p:4, d:'Pro. Fussy residents, fast orderlies, and Gerald has no patience left.',
+   foeSpd:1.18,foeCd:.8, patience:.82,foes:1.25,hp:4,lure:.9,  wants:'all'}
+];
+var DIFF=LEVELS[clamp(parseInt(LS.get('cm_diff'),10)||0,0,LEVELS.length-1)];
+/* how hot is it. One chilli per notch. */
+function peppers(L){ var c=''; for(var i=0;i<L.p;i++) c+='\ud83c\udf36'; return c+'  '+L.n; }
+function setDiff(i){ i=clamp(i|0,0,LEVELS.length-1); DIFF=LEVELS[i]; LS.set('cm_diff',String(i)); }
 
 /* The Pac-Man pellet. Three flavours, same result: the guards start running. */
 var TREATS=[
@@ -1105,7 +1132,13 @@ function startPhase(ph){
 }
 
 function makeSenior(world){
-  var opts=[]; for(var lw in LURES) if(!P||P.wep[lw]) opts.push(lw);
+  /* Sorting out WHICH snack each resident wants is a second puzzle on top of
+     steering a conga line, and it is the one that stops a beginner cold. Below
+     the top two levels, everyone simply wants candy. The variety is what the
+     slider buys you. */
+  var opts=[];
+  if(DIFF.wants==='candy') opts=['candy'];
+  else for(var lw in LURES) if(!P||P.wep[lw]) opts.push(lw);
   if(!opts.length) opts=['candy'];
   var s={x:0,y:0,vx:0,vy:0,r:17,st:'wander',name:pick(SENIOR_NAMES),
          want:pick(opts),wp:null,eat:0,say:0,txt:'',
@@ -2739,15 +2772,26 @@ function menu(){
       '<button class="btn go" id="mPlay">PLAY</button>'+
       '<button class="btn ghost" id="mHow">HOW TO PLAY</button>'+
     '</div>'+
-    '<div class="rowbtns" style="margin-top:10px">'+
-      '<button class="btn ghost" id="mDiff">MODE: '+DIFF.n+'</button>'+
+    '<div class="diffbox">'+
+      '<input type="range" id="mDiffR" min="0" max="'+(LEVELS.length-1)+'" step="1" '+
+        'value="'+LEVELS.indexOf(DIFF)+'" aria-label="Difficulty">'+
+      '<div class="diffends"><span>mild</span><span>thai hot</span></div>'+
+      '<div class="difflbl" id="mDiffN">'+peppers(DIFF)+'</div>'+
+      '<div class="diffdesc" id="mDiffD">'+DIFF.d+'</div>'+
     '</div>'+
-    '<p class="small">Beginner gives you an extra heart, slower orderlies, more '+
-    'patience from Gerald, and snacks he can smell from further away.</p>'+
     '<div class="tag" style="margin-top:12px">Best purse: <b style="color:var(--sun)">'+BEST+'</b> coins</div>'
   );
   on('mPlay',function(){ startGame(); });
-  on('mDiff',function(){ setDiff(DIFF===DIFFS.beginner?'normal':'beginner'); menu(); });
+  /* live-updated in place rather than rebuilding the menu, so the thumb stays
+     under her finger while she drags it */
+  (function(){
+    var r=$('mDiffR'); if(!r) return;
+    r.addEventListener('input',function(){
+      setDiff(parseInt(r.value,10));
+      $('mDiffN').textContent=peppers(DIFF);
+      $('mDiffD').textContent=DIFF.d;
+    });
+  })();
   on('mHow',function(){ howto(); });
 }
 function howto(back){
