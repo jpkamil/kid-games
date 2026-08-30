@@ -658,14 +658,17 @@ var SHOP=[
    is lose, and the point is to get far enough in to meet the jokes. Normal is the
    game as tuned. Nothing here changes what is possible -- only the pressure. */
 var LEVELS=[
-  {n:'MILD', p:1, d:'Learning the rules. Everyone wants candy, the orderlies are slow, and you get an extra heart.',
-   foeSpd:.70,foeCd:1.7,patience:1.5,foes:.55,hp:6,lure:1.35,wants:'candy'},
-  {n:'MEDIUM', p:2, d:'Still all candy, but they move like they mean it.',
-   foeSpd:.85,foeCd:1.3,patience:1.2,foes:.8, hp:6,lure:1.15,wants:'candy'},
-  {n:'HOT', p:3, d:'Now they each want a different snack. Watch the bubbles.',
-   foeSpd:1,  foeCd:1,   patience:1,  foes:1,  hp:5,lure:1,   wants:'all'},
-  {n:'THAI HOT', p:4, d:'Pro. Fussy residents, fast orderlies, and Gerald has no patience left.',
-   foeSpd:1.18,foeCd:.8, patience:.82,foes:1.25,hp:4,lure:.9,  wants:'all'}
+  {n:'MILD', p:1, d:'Learning the rules. Everyone wants candy, the orderlies are slow, and nobody gets taken back.',
+   foeSpd:.70,foeCd:1.7,patience:1.5,foes:.55,hp:6,lure:1.35,wants:'candy',steal:null},
+  {n:'MEDIUM', p:2, d:'Still all candy, but now the orderlies grab people off the back of your line.',
+   foeSpd:.85,foeCd:1.3,patience:1.2,foes:.8, hp:6,lure:1.15,wants:'candy',
+   steal:{r:34,spd:64,cool:6.0,tail:2}},
+  {n:'HOT', p:3, d:'They each want a different snack, and the orderlies are quicker to grab.',
+   foeSpd:1,  foeCd:1,   patience:1,  foes:1,  hp:5,lure:1,   wants:'all',
+   steal:{r:40,spd:78,cool:4.0,tail:2}},
+  {n:'THAI HOT', p:4, d:'Pro. They can take ANYONE off your line, not just the back. Travel light.',
+   foeSpd:1.18,foeCd:.8, patience:.82,foes:1.25,hp:4,lure:.9,  wants:'all',
+   steal:{r:46,spd:92,cool:2.5,tail:99}}
 ];
 var DIFF=LEVELS[clamp(parseInt(LS.get('cm_diff'),10)||0,0,LEVELS.length-1)];
 /* how hot is it. One chilli per notch. */
@@ -819,6 +822,8 @@ function buildHome(){
     W2.walls.push(r); W2.decor.push({t:'hedge',r:r});
   }
   var bld=aabb(60,60,140,300); W2.walls.push(bld); W2.decor.push({t:'bldg',r:bld});
+  /* the front door they get marched back through */
+  W2.doors={x:130,y:392};
   W2.decor.push({t:'fountain',x:760,y:600,r:44});
   W2.walls.push(aabb(760-40,600-40,80,80));
 
@@ -877,7 +882,7 @@ function buildEscape(){
 /* ---- enemies -------------------------------------------------------------*/
 function makeFoe(t,x,y){
   var f={t:t,x:x,y:y,vx:0,vy:0,r:15,stun:0,hp:1,ang:rnd(0,TAU),walk:0,
-         see:0,cd:0,wp:null,target:null,hitcd:0};
+         see:0,cd:0,wp:null,target:null,hitcd:0,carry:null,grabcd:0};
   if(t==='zomcop'){ f.spd=52; f.r=16; }
   if(t==='guard'){ f.spd=74; f.r=16; f.vis=210; f.cone=0.85; f.cd=rnd(.4,1.4); }
   if(t==='nurse'){ f.spd=96; f.r=15; f.vis=180; f.cone=1.0; f.cd=rnd(.6,1.6); }
@@ -1115,8 +1120,8 @@ function startPhase(ph){
     var ns=seniorsThisRound();
     /* Gerald packs you a bag. Without this you can arrive with no lures and no
        way to earn any, and the phase simply never ends. */
-    P.ammo.candy=Math.max(P.ammo.candy,ns+3);
-    P.ammo.cake=Math.max(P.ammo.cake,ns+3);
+    P.ammo.candy=Math.max(P.ammo.candy,ns*2+4);
+    P.ammo.cake=Math.max(P.ammo.cake,ns*2+4);
     for(var s=0;s<ns;s++) W.seniors.push(makeSenior(W));
     W.left=ns;
     var ng2=Math.max(1,Math.round(Math.min(5,2+Math.floor(ROUND*.7))*DIFF.foes));
@@ -1322,6 +1327,27 @@ function updateFoes(dt){
   for(var i=W.foes.length-1;i>=0;i--){
     var f=W.foes[i];
 
+    /* THE ORDERLIES TAKE THEM BACK.
+       The game is named for leading a line of people past security, and until now
+       security had no idea the line existed -- you only ever lost followers by
+       getting hit yourself. An orderly now grabs someone off your line and marches
+       him back to the front door.
+       The one invariant that makes this safe: W.left is NEVER touched here. It
+       moves only at the gate, in updateSeniors. A stolen resident goes back to
+       wandering and can always be lured again, so no amount of theft can make the
+       phase unwinnable -- it costs time, never progress. */
+    if(f.carry&&(f.stun>0||f.ejected||P.buff.rampage>0)){
+      var got=f.carry; f.carry=null; got.captor=null;
+      got.st='wander'; got.wp=null; got.say=2.2; got.txt=pick(RESCUED_LINES);
+      f.grabcd=1.5;
+      /* the lure he ate on the way out is refunded, so a theft can never eat the
+         ammo she needs to get him back. That would be a soft-lock wearing a
+         different hat. */
+      P.ammo[got.want]=(P.ammo[got.want]||0)+1;
+      pop(got.x,got.y,'RESCUED!','#8ce34f'); burst(got.x,got.y,'#8ce34f',10);
+      SFX.free(); syncHud();
+    }
+
     if(f.ejected){
       f.ejected+=dt; f.x+=f.evx*dt; f.y+=f.evy*dt; f.evy+=900*dt; f.ang+=f.espin*dt;
       if(f.ejected>1.3){
@@ -1351,6 +1377,41 @@ function updateFoes(dt){
       f.walk+=dt*7;
       if(d<P.r+f.r){ ejectFoe(f); }
       continue;
+    }
+
+    if(f.grabcd>0) f.grabcd-=dt;
+
+    /* carrying someone: he stops caring about you and walks to the door */
+    if(f.carry){
+      var cs=f.carry, dr=W.doors||{x:130,y:392};
+      var cdx=dr.x-f.x, cdy=dr.y-f.y, cm=Math.max(1,Math.hypot(cdx,cdy));
+      var csp=(DIFF.steal?DIFF.steal.spd:70)*slow;
+      moveEnt(f,cdx/cm*csp*dt,cdy/cm*csp*dt,W);
+      f.ang=Math.atan2(cdy,cdx); f.walk+=dt*7;
+      cs.x=f.x; cs.y=f.y+14; cs.ang=f.ang;
+      if(cm<44){
+        cs.st='wander'; cs.wp=null; cs.captor=null;
+        cs.x=dr.x+46; cs.y=dr.y+34; cs.say=2.6; cs.txt='I WAS ALMOST OUT.';
+        f.carry=null; f.grabcd=(DIFF.steal?DIFF.steal.cool:5);
+        toast(cs.name.toUpperCase()+' GOT PUT BACK','bad');
+      }
+      continue;
+    }
+
+    /* grabbing someone off the back of the line */
+    if(PHASE==='home'&&DIFF.steal&&!ramp&&f.grabcd<=0&&f.stun<=0&&P.followers.length){
+      var st=DIFF.steal, tail=Math.min(st.tail,P.followers.length);
+      for(var q=P.followers.length-1;q>=P.followers.length-tail;q--){
+        var cand=P.followers[q]; if(!cand||cand.freed) continue;
+        if(dist2(f.x,f.y,cand.x,cand.y)<(st.r+cand.r)*(st.r+cand.r)){
+          P.followers.splice(q,1);
+          cand.st='taken'; cand.captor=f; cand.lure=null; f.carry=cand;
+          toast(cand.name.toUpperCase()+' GOT GRABBED!','bad');
+          pop(cand.x,cand.y,'HEY!','#ff4d5e'); shake(7); SFX.taser();
+          break;
+        }
+      }
+      if(f.carry) continue;
     }
 
     if(f.t==='zomcop'){
@@ -1428,6 +1489,8 @@ function updateCats(dt){
    SENIORS — confused, in golf carts, bribeable with snacks
    ==========================================================================*/
 /* He is a mall cop with a taser and a great deal of conviction. */
+var RESCUED_LINES=['OH THANK GOD.','I OWE YOU A CASSEROLE.','PUT ME DOWN. HE DID.',
+  'I WAS NOT DONE ESCAPING.','THAT MAN IS RUDE.'];
 var TASER_BARKS=['SIR.','STOP RIGHT THERE.','SIR, THE CART.','THAT IS NOT YOURS.',
   'CODE BROWN.','I AM AUTHORISED.','SIR. SIR. SIR.','THIS IS A CITIZEN\u2019S TASE.',
   'DO NOT MAKE ME JOG.','I HAVE A RADIO.'];
@@ -1436,6 +1499,32 @@ var CARTS=['#ded6c4','#cfd9e2','#e0cdd2','#cfdcc6'];
 var LURE_E={candy:'🍬',catfood:'🐈',cake:'🍰'};
 function lureAmmoTotal(){ var n=0; for(var k in LURES) n+=P.ammo[k]||0; return n; }
 function updateSeniors(dt){
+  /* A LURE FLOOR. Running the bag dry in Shady Pines was a dead end: nothing is
+     buyable until after the escape, so a player who missed enough throws stood in
+     a building full of people she had no way to move, and the phase could not end.
+     Found by a bot that threw badly on MILD -- where nothing is even stealing from
+     her -- so this predates the orderlies and would have bitten a real kid.
+     Gerald has deep pockets. */
+  if(W.left>0){
+    /* The real question is not "has she got ammo" but "is there any resident left
+       she could still move". A landed snack nobody wants is not a way forward, and
+       an earlier version of this floor counted one and stayed silent forever. */
+    var canLure=false;
+    for(var qi=0;qi<W.seniors.length&&!canLure;qi++){
+      var qs=W.seniors[qi];
+      if(qs.freed||qs.st==='follow'||qs.st==='taken') continue;
+      if((P.ammo[qs.want]||0)>0){ canLure=true; break; }
+      for(var li=0;li<W.shots.length;li++){
+        var lsh=W.shots[li];
+        if(lsh.t==='lure'&&!lsh.dead&&lsh.kind===qs.want){ canLure=true; break; }
+      }
+    }
+    /* nobody in the building is reachable: that is a dead phase, so restock */
+    if(!canLure&&W.seniors.some(function(z){return !z.freed&&z.st!=='follow';})){
+      P.ammo.candy+=3;
+      toast('GERALD SLIPS YOU MORE CANDY','gold'); SFX.grab(); syncHud();
+    }
+  }
   /* How close a dropped snack has to land before he notices it. 95 was about a
      quarter of a phone screen, with nothing on screen to say so, so a throw that
      looked fine did nothing and the whole phase read as broken. */
@@ -1455,6 +1544,8 @@ function updateSeniors(dt){
       var have=[]; for(var lk in LURES) if(P.wep[lk]&&(P.ammo[lk]||0)>0) have.push(lk);
       if(have.length&&have.indexOf(s.want)<0) s.want=pick(have);
     }
+
+    if(s.st==='taken'){ continue; }   /* the orderly is moving him */
 
     if(s.st==='wander'){
       if(!s.wp||dist2(s.x,s.y,s.wp.x,s.wp.y)<800||s.stuck>1.6){
@@ -1548,7 +1639,7 @@ function lureFor(){
   var best=null, bd=1e9, ax=P.aimx||1, ay=P.aimy||0;
   for(var i=0;i<W.seniors.length;i++){
     var s=W.seniors[i];
-    if(s.freed||s.st==='follow') continue;
+    if(s.freed||s.st==='follow'||s.st==='taken') continue;
     var dx=s.x-P.x, dy=s.y-P.y, d=Math.max(1,Math.hypot(dx,dy));
     if(d>460) continue;
     var dot=(dx*ax+dy*ay)/d;          /* only ones she is roughly facing */
@@ -2206,6 +2297,14 @@ function drawFoe(f,i){
     ctx.fillStyle='#ffcf3d'; ctx.beginPath(); ctx.arc(x,hy-R-3.2,1.9,0,TAU); ctx.fill();
   }
 
+  /* whoever he is carrying, on a very visible leash */
+  if(f.carry){
+    ctx.strokeStyle='#ff4d5e'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.setLineDash([6,5]);
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(f.carry.x,f.carry.y); ctx.stroke();
+    ctx.setLineDash([]);
+    em(ctx,'\ud83d\udea8',x,hy-R-14,15);
+  }
   /* the taser, held out in front of him */
   if(!scared&&f.stun<=0){
     var hx=x+Math.cos(f.ang)*13, hyy=y+Math.sin(f.ang)*13+bob*.3;
@@ -2558,7 +2657,12 @@ function drawCompass(){
       }
     }
   } else if(PHASE==='home'){
-    if(P.followers.length){ tx=W.goal.x+W.goal.w/2; ty=W.goal.y+W.goal.h/2; col='#8ce34f'; lab='GATE'; }
+    /* highest priority: somebody is being carried off */
+    for(var ci=0;ci<W.foes.length;ci++){
+      if(W.foes[ci].carry){ tx=W.foes[ci].x; ty=W.foes[ci].y; col='#ff4d5e'; lab='HELP!'; break; }
+    }
+    if(tx!==null){ /* nothing else matters right now */ }
+    else if(P.followers.length){ tx=W.goal.x+W.goal.w/2; ty=W.goal.y+W.goal.h/2; col='#8ce34f'; lab='GATE'; }
     else { var b2=1e9;
       for(var q=0;q<W.seniors.length;q++){ var se=W.seniors[q]; if(se.st!=='wander') continue;
         var d2=dist2(P.x,P.y,se.x,se.y); if(d2<b2){b2=d2;tx=se.x;ty=se.y;col='#4bc8ff';lab='SENIOR';} }
@@ -2806,7 +2910,7 @@ function howto(back){
       '<div><span class="k">1</span><span><b>Grumble-Mart.</b> Read the order. Get exactly those items. Wrong item = cane.</span></div>'+
       '<div><span class="k">2</span><span><b>Shady Pines.</b> Throw the treat each resident is thinking about, then lead the conga line to the gate.</span></div>'+
       '<div><span class="k">3</span><span><b>The Escape.</b> Run right. Do not get hit by a cart, a sprinkler or a bingo ball.</span></div>'+
-      '<div><span class="k">🥤</span><span><b>Snacks aim themselves.</b> In Shady Pines the button shows whatever the nearest resident is asking for, so just point at him and throw.</span></div>'+      '<div><span class="k">\ud83e\uddcb</span><span><b>Treat = rampage.</b> Boba, energy drink or ice cream \u2014 two in the store, two in Shady Pines. For 20 seconds the guards and the taser orderlies run from <i>you</i>. Touch one to eject him. Chain them for double coins.</span></div>'+
+      '<div><span class="k">🥤</span><span><b>Snacks aim themselves.</b> In Shady Pines the button shows whatever the nearest resident is asking for, so just point at him and throw.</span></div>'+      '<div><span class="k">\ud83d\udea8</span><span><b>They take them back.</b> Above Mild, an orderly will grab someone off the end of your line and march him to the front door. Hit the orderly with anything \u2014 a snack, a shove, the GRAB button \u2014 and he drops him. Follow the red HELP! arrow.</span></div>'+      '<div><span class="k">\ud83e\uddcb</span><span><b>Treat = rampage.</b> Boba, energy drink or ice cream \u2014 two in the store, two in Shady Pines. For 20 seconds the guards and the taser orderlies run from <i>you</i>. Touch one to eject him. Chain them for double coins.</span></div>'+
       '<div><span class="k">💀</span><span>Out of hearts = you go to jail = game over. Start again.</span></div>'+
     '</div>'+
     '<div class="rowbtns"><button class="btn go" id="hBack">GOT IT</button></div>'
@@ -2819,7 +2923,8 @@ function brief(next){
   if(next==='home'){ f='👵'; t='SHADY PINES';
     b='<b>GERALD:</b> "Now the important job. My friends are trapped in that home. '+
       'They are confused and they are driving golf carts. Bribe them out. Snacks work. '+
-      'Snacks always work."'; }
+      'Snacks always work. And watch your back \u2014 the orderlies will walk them '+
+      'straight back inside if you let them."'; }
   else { f='🚨'; t='RUN';
     b='<b>GERALD:</b> "Somebody called the police. And the <i>retirement home</i> police. '+
       'Which are worse. Go out the back. I will be at bingo."'; }
