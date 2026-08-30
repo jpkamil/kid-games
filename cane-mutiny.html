@@ -1928,8 +1928,51 @@ function drawPuddles(){
 /* ---- characters ----------------------------------------------------------*/
 function shadow(x,y,r){ ctx.fillStyle='rgba(0,0,0,.17)'; ctx.beginPath(); ctx.ellipse(x,y+r*.86,r*.86,r*.36,0,0,TAU); ctx.fill(); }
 
+/* ===========================================================================
+   CHARACTER STYLE -- one grammar for the whole cast.
+   Flat fills, one dark ink line round every shape, heads far too big for the
+   bodies, and big white eyes with small pupils. Everything from here down is
+   built out of these helpers so the cast looks like it comes from one show.
+   The style borrows the GRAMMAR of the flat, thick-outlined, big-head cartoon
+   tradition -- construction from simple geometry, no shading, no gradients --
+   rather than any particular show's characters.
+   ========================================================================= */
+var INK='#231a33';
+function ink(w){ ctx.strokeStyle=INK; ctx.lineWidth=w||2.6;
+  ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke(); }
+function disc(x,y,r,fill,w){ ctx.beginPath(); ctx.arc(x,y,r,0,TAU);
+  ctx.fillStyle=fill; ctx.fill(); ink(w); }
+function slab(x,y,w2,h,rad,fill,w){ rr(ctx,x,y,w2,h,rad);
+  ctx.fillStyle=fill; ctx.fill(); ink(w); }
+function poly(pts,fill,w){ ctx.beginPath(); ctx.moveTo(pts[0],pts[1]);
+  for(var i=2;i<pts.length;i+=2) ctx.lineTo(pts[i],pts[i+1]);
+  ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ink(w); }
+function halfDisc(x,y,r,a0,a1,fill,w){ ctx.beginPath(); ctx.arc(x,y,r,a0,a1);
+  ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ink(w); }
+/* The one feature every character shares: big white eyes, small pupils. */
+function eyes(cx,cy,sp,er,pr,look){
+  disc(cx-sp,cy,er,'#fff',1.8); disc(cx+sp,cy,er,'#fff',1.8);
+  ctx.fillStyle=INK; ctx.beginPath();
+  ctx.arc(cx-sp+look*(er-pr),cy,pr,0,TAU);
+  ctx.arc(cx+sp+look*(er-pr),cy,pr,0,TAU); ctx.fill();
+}
+/* A heavy upper lid. This does more to age a face than anything but the hair. */
+function hoodedLids(cx,cy,sp,er,skin){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx-sp,cy,er,0,TAU); ctx.arc(cx+sp,cy,er,0,TAU);
+  ctx.clip();
+  ctx.fillStyle=skin;
+  ctx.fillRect(cx-sp-er-1,cy-er-1,(sp+er)*2+2,er*0.92);
+  ctx.restore();
+  ctx.strokeStyle=INK; ctx.lineWidth=1.8; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(cx-sp-er*0.95,cy-er*0.08); ctx.lineTo(cx-sp+er*0.95,cy-er*0.08);
+  ctx.moveTo(cx+sp-er*0.95,cy-er*0.08); ctx.lineTo(cx+sp+er*0.95,cy-er*0.08);
+  ctx.stroke();
+}
+
 function drawPlayer(){
-  var bob=Math.sin(P.walk)*2.4, sq=1+Math.sin(P.walk*2)*.03;
+  var bob=Math.sin(P.walk)*2.2;
   shadow(P.x,P.y,P.r);
   if(P.iframe>0&&Math.floor(P.iframe*16)%2===0) ctx.globalAlpha=.45;
   if(P.buff.rampage>0){
@@ -1939,49 +1982,64 @@ function drawPlayer(){
   }
   if(P.dashing>0){ ctx.fillStyle='rgba(75,200,255,.35)';
     ctx.beginPath(); ctx.arc(P.x-P.vx*.03,P.y-P.vy*.03,P.r,0,TAU); ctx.fill(); }
-  /* legs -- shorter than they were, because they come out from under a skirt */
-  ctx.strokeStyle='#2d2450'; ctx.lineWidth=4.5; ctx.lineCap='round';
-  var lw=Math.sin(P.walk)*5;
-  ctx.beginPath(); ctx.moveTo(P.x-4,P.y+9); ctx.lineTo(P.x-4+lw,P.y+17);
-  ctx.moveTo(P.x+4,P.y+9); ctx.lineTo(P.x+4-lw,P.y+17); ctx.stroke();
-  /* hair, behind the head so the face sits on top of it */
-  ctx.fillStyle='#5b3a29';
-  ctx.beginPath(); ctx.arc(P.x,P.y-15+bob,10.5,0,TAU); ctx.fill();
-  /* ponytail, swinging against the stride */
+
+  var x=P.x, y=P.y, f=P.face, R=11;         /* R is the head; everything scales off it */
+  var hy=y-13+bob;                          /* head centre */
+  var dress=P.up.shirt?'#ff7ab0':'#4bc8ff';
+  var lw=Math.sin(P.walk)*4.5;
+
+  /* legs: stubby, thick, ink only */
+  ctx.strokeStyle=INK; ctx.lineWidth=4.6; ctx.lineCap='round';
   ctx.beginPath();
-  ctx.ellipse(P.x-P.face*10,P.y-12+bob+Math.sin(P.walk)*1.8,4.4,7.6,-P.face*.45,0,TAU);
-  ctx.fill();
-  /* the dress: shoulders in, hem out */
-  ctx.fillStyle=P.up.shirt?'#ff7ab0':'#4bc8ff';
-  ctx.beginPath();
-  ctx.moveTo(P.x-9,P.y-8+bob*.3); ctx.lineTo(P.x+9,P.y-8+bob*.3);
-  ctx.lineTo(P.x+14,P.y+10*sq); ctx.lineTo(P.x-14,P.y+10*sq);
-  ctx.closePath(); ctx.fill();
-  /* a lighter band at the waist so the skirt reads as a skirt */
-  ctx.fillStyle='rgba(255,255,255,.22)';
-  rr(ctx,P.x-9.5,P.y-1+bob*.3,19,3.5,1.6); ctx.fill();
+  ctx.moveTo(x-4,y+6); ctx.lineTo(x-4+lw,y+15);
+  ctx.moveTo(x+4,y+6); ctx.lineTo(x+4-lw,y+15); ctx.stroke();
+  /* shoes */
+  disc(x-4+lw,y+16,2.6,'#2b2b3a',1.6); disc(x+4-lw,y+16,2.6,'#2b2b3a',1.6);
+
+  /* the dress: a wedge, shoulders in, hem out */
+  poly([x-8,y-6, x+8,y-6, x+13,y+8, x-13,y+8],dress,2.8);
+  ctx.fillStyle='rgba(255,255,255,.28)'; rr(ctx,x-8.5,y-1,17,3,1.5); ctx.fill();
   if(P.up.shirt){ ctx.fillStyle='#ffe066';
-    for(var f=0;f<3;f++){ ctx.beginPath(); ctx.arc(P.x-6+f*6,P.y+5+bob*.3,2.4,0,TAU); ctx.fill(); } }
-  /* head */
-  ctx.fillStyle='#ffd9b0'; ctx.beginPath(); ctx.arc(P.x,P.y-15+bob,9,0,TAU); ctx.fill();
-  /* a fringe, so she is not bald under the cap */
-  ctx.fillStyle='#5b3a29';
-  ctx.beginPath(); ctx.arc(P.x,P.y-17+bob,9.2,Math.PI*1.08,TAU*.99); ctx.fill();
-  /* hat or wig */
-  if(P.up.wig){ ctx.fillStyle='#e8e4f2'; ctx.beginPath(); ctx.arc(P.x,P.y-18+bob,10.5,Math.PI,TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(P.x-9,P.y-15+bob,4.5,0,TAU); ctx.arc(P.x+9,P.y-15+bob,4.5,0,TAU); ctx.fill(); }
-  else { ctx.fillStyle='#ff5c8a'; rr(ctx,P.x-10,P.y-23+bob,20,7,3); ctx.fill();
-    ctx.fillStyle='#ff5c8a'; rr(ctx,P.x+(P.face>0?2:-12),P.y-19+bob,10,4,2); ctx.fill(); }
-  /* eyes */
-  ctx.fillStyle='#231a3d';
-  ctx.beginPath(); ctx.arc(P.x+P.face*2-2.5,P.y-15+bob,1.7,0,TAU);
-  ctx.arc(P.x+P.face*2+2.5,P.y-15+bob,1.7,0,TAU); ctx.fill();
+    for(var b=0;b<3;b++){ ctx.beginPath(); ctx.arc(x-5+b*5,y+3.5,1.9,0,TAU); ctx.fill(); } }
+
+  /* arms, one swinging forward */
+  ctx.strokeStyle=INK; ctx.lineWidth=3.6;
+  ctx.beginPath();
+  ctx.moveTo(x-8,y-4); ctx.lineTo(x-11-lw*.6,y+2);
+  ctx.moveTo(x+8,y-4); ctx.lineTo(x+11+lw*.6,y+2); ctx.stroke();
+  disc(x-11-lw*.6,y+3,2.4,'#ffd9b0',1.6); disc(x+11+lw*.6,y+3,2.4,'#ffd9b0',1.6);
+
+  /* head, too big on purpose */
+  disc(x,hy,R,'#ffd9b0',2.8);
+  /* hair: a cap over the top, plus a ponytail on the trailing side */
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x,hy,R,0,TAU); ctx.clip();
+  ctx.fillStyle='#6b4326';
+  ctx.beginPath(); ctx.arc(x,hy-2.2,R,Math.PI,TAU); ctx.fill();
+  ctx.fillRect(x-R,hy-R,R*2,R*0.55);
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(x,hy,R,0,TAU); ink(2.8);
+  disc(x-f*10.5,hy-1+Math.sin(P.walk)*1.5,4.4,'#6b4326',2.4);
+
+  /* face */
+  eyes(x,hy+0.5,4.3,3.5,1.7,f);
+  ctx.strokeStyle=INK; ctx.lineWidth=1.9; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(x,hy+4.4,3,0.18*Math.PI,0.82*Math.PI); ctx.stroke();
+
+  if(!P.up.wig){ /* her cap */
+    slab(x-R-0.5,hy-R-1.5,R*2+1,5.5,2.5,'#ff5c8a',2.4);
+    slab(x+(f>0?2:-11),hy-R+1,9,3.6,1.8,'#ff5c8a',2.2);
+  } else {       /* the disguise wig */
+    disc(x,hy-3,R+1.5,'#e8e4f2',2.6);
+    disc(x-9.5,hy-1,4.6,'#e8e4f2',2.2); disc(x+9.5,hy-1,4.6,'#e8e4f2',2.2);
+  }
+
   /* the bag of groceries */
   if(P.cart.length){
-    ctx.fillStyle='#d9c39a'; rr(ctx,P.x+P.face*11-6,P.y-4+bob*.4,13,15,3); ctx.fill();
-    ctx.fillStyle='#b9a077'; rr(ctx,P.x+P.face*11-6,P.y-4+bob*.4,13,4,2); ctx.fill();
-    ctx.fillStyle='#231a3d'; ctx.font='700 9px "Roboto Mono",monospace'; ctx.textAlign='center';
-    ctx.fillText(String(P.cart.length),P.x+P.face*11+.5,P.y+7+bob*.4);
+    slab(x+f*13-6,y-3,13,15,2.5,'#d9c39a',2.4);
+    ctx.fillStyle='#b9a077'; rr(ctx,x+f*13-6,y-3,13,4,1.5); ctx.fill();
+    ctx.fillStyle=INK; ctx.font='700 9px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText(String(P.cart.length),x+f*13+.5,y+8);
   }
   ctx.globalAlpha=1;
 }
@@ -1990,164 +2048,208 @@ function drawFoe(f,i){
   if(f.ejected){
     ctx.save(); ctx.translate(f.x,f.y); ctx.rotate(f.ang);
     ctx.globalAlpha=clamp(1.3-f.ejected,0,1);
-    ctx.fillStyle='#4bc8ff'; ctx.beginPath(); ctx.arc(0,0,f.r,0,TAU); ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='700 11px Fredoka,sans-serif'; ctx.textAlign='center';
+    disc(0,0,f.r,'#4bc8ff',2.6);
+    ctx.fillStyle=INK; ctx.font='700 11px Fredoka,sans-serif'; ctx.textAlign='center';
     ctx.fillText('BYE',0,4);
     ctx.restore(); ctx.globalAlpha=1; return;
   }
   var scared=P.buff.rampage>0;
   var bob=Math.sin(f.walk)*2.2;
-  shadow(f.x,f.y,f.r);
+  var x=f.x, y=f.y;
+  shadow(x,y,f.r);
   /* vision cone while patrolling */
   if(!scared&&(f.t==='guard'||f.t==='nurse')&&f.stun<=0){
     var alert=f.see>(P.up.shirt?.9:.45);
     ctx.fillStyle=alert?'rgba(255,77,94,.14)':'rgba(255,207,61,.10)';
-    ctx.beginPath(); ctx.moveTo(f.x,f.y);
-    ctx.arc(f.x,f.y,f.vis,f.ang-f.cone,f.ang+f.cone); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x,y);
+    ctx.arc(x,y,f.vis,f.ang-f.cone,f.ang+f.cone); ctx.closePath(); ctx.fill();
   }
-  var body = scared?'#4b6bd8' : (f.t==='zomcop'?'#7fae5c':(f.t==='nurse'?'#e8eef8':'#2f3d78'));
-  var skin = scared?'#cfe0ff' : (f.t==='zomcop'?'#a8cf86':'#ffd9b0');
-  ctx.strokeStyle='#26203f'; ctx.lineWidth=4; ctx.lineCap='round';
+
+  var zom=f.t==='zomcop', nur=f.t==='nurse';
+  var body = scared?'#4b6bd8' : (zom?'#7fae5c':(nur?'#eef3fb':'#2f3d78'));
+  var skin = scared?'#cfe0ff' : (zom?'#a8cf86':'#ffd9b0');
+  var R=11, hy=y-17+bob;
   var lw=Math.sin(f.walk)*5;
-  ctx.beginPath(); ctx.moveTo(f.x-4,f.y+7); ctx.lineTo(f.x-4+lw,f.y+16);
-  ctx.moveTo(f.x+4,f.y+7); ctx.lineTo(f.x+4-lw,f.y+16); ctx.stroke();
-  ctx.fillStyle=body; rr(ctx,f.x-11,f.y-9+bob*.3,22,19,6); ctx.fill();
-  ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(f.x,f.y-16+bob,9.5,0,TAU); ctx.fill();
-  if(scared){
-    /* wobbly frightened face */
-    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(f.x-3.4,f.y-17+bob,2.6,0,TAU); ctx.arc(f.x+3.4,f.y-17+bob,2.6,0,TAU); ctx.fill();
-    ctx.fillStyle='#123'; ctx.beginPath(); ctx.arc(f.x-3.4,f.y-17+bob,1.3,0,TAU); ctx.arc(f.x+3.4,f.y-17+bob,1.3,0,TAU); ctx.fill();
-    ctx.strokeStyle='#dfe9ff'; ctx.lineWidth=1.6; ctx.beginPath();
-    for(var k=0;k<4;k++){ ctx.moveTo(f.x-5+k*3.2,f.y-11+bob); ctx.lineTo(f.x-3.4+k*3.2,f.y-12.6+bob); }
-    ctx.stroke();
-  } else {
-    ctx.fillStyle='#231a3d';
-    ctx.beginPath(); ctx.arc(f.x-3,f.y-16+bob,1.8,0,TAU); ctx.arc(f.x+3,f.y-16+bob,1.8,0,TAU); ctx.fill();
-    if(f.t==='zomcop'||f.t==='guard'){ /* cop hat */
-      ctx.fillStyle=f.t==='zomcop'?'#4f6b3a':'#1c2555';
-      rr(ctx,f.x-10,f.y-26+bob,20,7,3); ctx.fill();
-      rr(ctx,f.x-7,f.y-30+bob,14,6,3); ctx.fill();
-      ctx.fillStyle='#ffcf3d'; ctx.beginPath(); ctx.arc(f.x,f.y-27+bob,1.9,0,TAU); ctx.fill();
-    }
-    if(f.t==='nurse'){ ctx.fillStyle='#fff'; rr(ctx,f.x-8,f.y-27+bob,16,6,2); ctx.fill();
-      ctx.fillStyle='#ff4d5e'; ctx.fillRect(f.x-1.4,f.y-26.5+bob,2.8,5); ctx.fillRect(f.x-4.5,f.y-25.4+bob,9,2.8); }
+
+  /* legs */
+  ctx.strokeStyle=INK; ctx.lineWidth=4.6; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(x-4,y+6); ctx.lineTo(x-4+lw,y+15);
+  ctx.moveTo(x+4,y+6); ctx.lineTo(x+4-lw,y+15); ctx.stroke();
+  disc(x-4+lw,y+16,2.6,'#2b2b3a',1.6); disc(x+4-lw,y+16,2.6,'#2b2b3a',1.6);
+  /* uniform */
+  slab(x-11,y-8,22,16,5,body,2.8);
+  if(!nur){ /* a belt and a badge */
+    ctx.fillStyle=INK; ctx.fillRect(x-11,y+2,22,3);
+    ctx.fillStyle='#ffcf3d'; ctx.beginPath(); ctx.arc(x-6,y-3,2.2,0,TAU); ctx.fill();
+  } else {  /* a red cross on the tunic */
+    ctx.fillStyle='#ff4d5e';
+    ctx.fillRect(x-1.4,y-5,2.8,8); ctx.fillRect(x-4.4,y-2.4,8.8,2.8);
   }
-  /* the taser, held out in front of him -- he never actually had one in his hand */
-  if(!scared&&f.stun<=0&&!f.ejected){
-    var hx=f.x+Math.cos(f.ang)*12, hy=f.y+Math.sin(f.ang)*12+bob*.3;
-    ctx.save(); ctx.translate(hx,hy); ctx.rotate(f.ang);
-    ctx.fillStyle='#2b2b3a'; rr(ctx,-4.5,-3,10,6,2); ctx.fill();
-    ctx.fillStyle='#f5c542'; rr(ctx,4.5,-1.7,3.4,3.4,1.2); ctx.fill();
+  /* arms */
+  ctx.strokeStyle=INK; ctx.lineWidth=3.6;
+  ctx.beginPath();
+  ctx.moveTo(x-10,y-5); ctx.lineTo(x-14-lw*.4,y+1);
+  ctx.moveTo(x+10,y-5); ctx.lineTo(x+14+lw*.4,y+1); ctx.stroke();
+  disc(x-14.5-lw*.4,y+2,2.4,skin,1.6);
+
+  /* head */
+  disc(x,hy,R,skin,2.8);
+  if(scared){
+    eyes(x,hy+0.5,4.3,4.2,1.5,0);
+    ctx.strokeStyle=INK; ctx.lineWidth=1.8; ctx.beginPath();
+    for(var k=0;k<4;k++){ ctx.moveTo(x-5+k*3.3,hy+6.5); ctx.lineTo(x-3.4+k*3.3,hy+4.9); }
+    ctx.stroke();
+  } else if(nur){
+    eyes(x,hy+0.5,4.3,3.6,1.7,0);
+    /* a flat, unimpressed mouth */
+    ctx.strokeStyle=INK; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(x-3.4,hy+6); ctx.lineTo(x+3.4,hy+6); ctx.stroke();
+    /* nurse cap */
+    slab(x-8.5,hy-R-3,17,6,2,'#fff',2.4);
+    ctx.fillStyle='#ff4d5e';
+    ctx.fillRect(x-1.1,hy-R-2.2,2.2,4.4); ctx.fillRect(x-3.2,hy-R-1.1,6.4,2.2);
+  } else {
+    /* aviators: one dark bar across the face, which is the whole character */
+    slab(x-8.4,hy-2.6,16.8,6.4,2.6,'#1a1526',2.2);
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.fillRect(x-6.6,hy-1.6,3.2,1.5); ctx.fillRect(x+1.4,hy-1.6,3.2,1.5);
+    /* a moustache he is very proud of */
+    ctx.fillStyle=zom?'#5c7a44':'#4a3b2a';
+    rr(ctx,x-5.6,hy+4.4,11.2,3.4,1.7); ctx.fill(); ink(1.6);
+    /* the hat */
+    slab(x-R-0.8,hy-R-1,R*2+1.6,5.6,2.4,zom?'#4f6b3a':'#1c2555',2.4);
+    slab(x-7.5,hy-R-6,15,5.6,2.4,zom?'#4f6b3a':'#1c2555',2.4);
+    ctx.fillStyle='#ffcf3d'; ctx.beginPath(); ctx.arc(x,hy-R-3.2,1.9,0,TAU); ctx.fill();
+  }
+
+  /* the taser, held out in front of him */
+  if(!scared&&f.stun<=0){
+    var hx=x+Math.cos(f.ang)*13, hyy=y+Math.sin(f.ang)*13+bob*.3;
+    ctx.save(); ctx.translate(hx,hyy); ctx.rotate(f.ang);
+    slab(-5,-3.2,10.5,6.4,2,'#2b2b3a',2);
+    ctx.fillStyle='#f5c542'; rr(ctx,4.6,-1.8,3.6,3.6,1.2); ctx.fill();
     if(f.see>0.15){
       var ph=W.time*26+f.walk;
-      ctx.strokeStyle='#9fe8ff'; ctx.lineWidth=1.5; ctx.lineCap='round';
-      ctx.beginPath(); ctx.moveTo(8,0);
-      ctx.lineTo(11,Math.sin(ph)*2.4); ctx.lineTo(14,Math.sin(ph*1.7)*-2.6);
+      ctx.strokeStyle='#9fe8ff'; ctx.lineWidth=1.6; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(8.5,0);
+      ctx.lineTo(11.5,Math.sin(ph)*2.4); ctx.lineTo(14.5,Math.sin(ph*1.7)*-2.6);
       ctx.stroke();
     }
     ctx.restore();
   }
+
   if(f.stun>0){
     ctx.fillStyle='#ffcf3d'; ctx.font='700 13px Fredoka,sans-serif'; ctx.textAlign='center';
-    var st=['✦','✧'][Math.floor(W.time*8)%2];
-    ctx.fillText(st+' '+st,f.x,f.y-32+bob);
+    var st=['\u2726','\u2727'][Math.floor(W.time*8)%2];
+    ctx.fillText(st+' '+st,x,hy-R-9);
   } else if(!scared&&f.see>0.15){
     ctx.fillStyle=f.see>(P.up.shirt?.9:.45)?'#ff4d5e':'#ffcf3d';
-    ctx.font='700 15px Fredoka,sans-serif'; ctx.textAlign='center';
-    ctx.fillText(f.see>(P.up.shirt?.9:.45)?'!':'?',f.x,f.y-30+bob);
+    ctx.font='700 17px Fredoka,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(f.see>(P.up.shirt?.9:.45)?'!':'?',x,hy-R-8);
   }
 }
 
 function drawSenior(s){
-  var bob=Math.sin(s.wob)*2;
-  shadow(s.x,s.y,s.r+4);
+  var bob=Math.sin(s.wob)*1.6;
+  var x=s.x, y=s.y;
+  shadow(x,y,s.r+4);
 
-  /* ---- the golf cart, pointing where he is driving ---- */
-  ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.ang);
-  /* wheels first, so the body sits over them */
-  ctx.fillStyle='#2f2a4a';
-  rr(ctx,-15,-17,9,7,3); ctx.fill();  rr(ctx,-15,10,9,7,3); ctx.fill();
-  rr(ctx,8,-17,9,7,3);   ctx.fill();  rr(ctx,8,10,9,7,3);   ctx.fill();
-  /* body */
-  ctx.fillStyle=s.cart||'#f5f2e6'; rr(ctx,-20,-13,40,26,7); ctx.fill();
-  /* seat back he is leaning against */
-  ctx.fillStyle='#d8d2bd'; rr(ctx,-19,-11,11,22,5); ctx.fill();
-  /* a stripe down the side, and the roof struts */
-  ctx.fillStyle='rgba(90,70,140,.16)'; rr(ctx,-20,-2.5,40,5,2); ctx.fill();
-  ctx.strokeStyle='rgba(90,70,140,.35)'; ctx.lineWidth=1.6;
-  ctx.beginPath(); ctx.arc(-13,-11,2.2,0,TAU); ctx.arc(-13,11,2.2,0,TAU);
-  ctx.arc(12,-11,2.2,0,TAU); ctx.arc(12,11,2.2,0,TAU); ctx.stroke();
-  /* steering wheel */
-  ctx.strokeStyle='#5b4f86'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(9,0,4.4,0,TAU); ctx.stroke();
-  /* headlights and the little flag every one of these has */
-  ctx.fillStyle='#ffe9a8';
-  ctx.beginPath(); ctx.arc(19,-7,2.4,0,TAU); ctx.arc(19,7,2.4,0,TAU); ctx.fill();
-  ctx.fillStyle='#8ce34f'; rr(ctx,-24,-2,7,4,1.5); ctx.fill();
+  /* ---- the cart, rotated to where he is driving ------------------------- */
+  ctx.save(); ctx.translate(x,y); ctx.rotate(s.ang);
+  /* tiny wheels, so the body reads as riding high like a cart and not a car */
+  ctx.fillStyle=INK;
+  rr(ctx,-15,-18,9,6,2.5); ctx.fill(); rr(ctx,-15,12,9,6,2.5); ctx.fill();
+  rr(ctx,7,-18,9,6,2.5);   ctx.fill(); rr(ctx,7,12,9,6,2.5);   ctx.fill();
+  /* the deck */
+  slab(-20,-14,40,28,6,s.cart||'#f5f2e6',2.8);
+  /* open sides: a bench back at the rear, nothing along the flanks */
+  slab(-19,-11,9,22,4,'#ded7c2',2.2);
+  /* flat front and a steering wheel */
+  ctx.strokeStyle=INK; ctx.lineWidth=2.2;
+  ctx.beginPath(); ctx.arc(10,0,4.6,0,TAU); ctx.stroke();
+  /* headlights */
+  disc(19,-8,2.4,'#ffe9a8',1.6); disc(19,8,2.4,'#ffe9a8',1.6);
+  /* Every one of them has had the left indicator on since about 1997.
+     Nobody in this building is going to mention it. */
+  disc(17,-13,2.5,(Math.floor(W.time*1.7+s.wob)%2===0)?'#ffa62b':'#6d5c3e',1.6);
+  /* the bag rack, and the flag every one of these has */
+  ctx.strokeStyle=INK; ctx.lineWidth=2.2;
+  ctx.beginPath(); ctx.moveTo(-21,-6); ctx.lineTo(-26,-6);
+  ctx.moveTo(-21,6); ctx.lineTo(-26,6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(-30,0); ctx.stroke();
+  poly([-30,0, -30,-8, -23,-4],'#8ce34f',2);
   ctx.restore();
 
-  /* ---- the resident, drawn facing you so he reads as a person ---- */
-  var hy=s.y-11+bob;                       /* head centre */
-  var hair=s.hair||'wave', cardi=s.cardi||'#b07ec9';
-  /* shoulders in a cardigan */
-  ctx.fillStyle=cardi; rr(ctx,s.x-11,hy+5,22,13,6); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.22)'; rr(ctx,s.x-2,hy+5,4,13,2); ctx.fill();
-  /* ears */
-  ctx.fillStyle='#ffd9b0';
-  ctx.beginPath(); ctx.arc(s.x-8.6,hy+1,2.3,0,TAU); ctx.arc(s.x+8.6,hy+1,2.3,0,TAU); ctx.fill();
-  /* head */
-  ctx.beginPath(); ctx.arc(s.x,hy,8.6,0,TAU); ctx.fill();
-  /* hair -- white, and a different head of it each time */
-  ctx.fillStyle='#eceaf4';
-  if(hair==='bald'){
-    /* a fringe round the back and sides, and nothing on top */
-    ctx.beginPath(); ctx.arc(s.x,hy,8.9,Math.PI*0.86,Math.PI*0.14); ctx.fill();
-    ctx.beginPath(); ctx.arc(s.x-7.6,hy-2.2,2.6,0,TAU); ctx.arc(s.x+7.6,hy-2.2,2.6,0,TAU); ctx.fill();
-  } else if(hair==='bun'){
-    ctx.beginPath(); ctx.arc(s.x,hy-1.4,8.9,Math.PI,TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(s.x,hy-10.4,4.2,0,TAU); ctx.fill();
-  } else {
-    ctx.beginPath(); ctx.arc(s.x,hy-1.2,9,Math.PI,TAU); ctx.fill();
-    /* a scalloped hairline, so it is hair and not a helmet */
-    ctx.beginPath(); ctx.arc(s.x-5,hy-2.6,3.1,0,TAU); ctx.arc(s.x,hy-3.4,3.3,0,TAU);
-    ctx.arc(s.x+5,hy-2.6,3.1,0,TAU); ctx.fill();
-  }
-  /* eyebrows -- the single most "old" thing on a face */
-  ctx.strokeStyle='#d6d1e4'; ctx.lineWidth=1.6; ctx.lineCap='round';
+  /* ---- the roof, drawn unrotated so it always reads as a canopy --------- */
+  ctx.strokeStyle=INK; ctx.lineWidth=2.4; ctx.lineCap='round';
   ctx.beginPath();
-  ctx.moveTo(s.x-5.6,hy-3.4); ctx.lineTo(s.x-1.8,hy-4.2);
-  ctx.moveTo(s.x+1.8,hy-4.2); ctx.lineTo(s.x+5.6,hy-3.4); ctx.stroke();
-  /* eyes */
-  ctx.fillStyle='#231a3d';
-  ctx.beginPath(); ctx.arc(s.x-3.2,hy-0.4,1.5,0,TAU); ctx.arc(s.x+3.2,hy-0.4,1.5,0,TAU); ctx.fill();
-  /* glasses, on most of them */
-  if(s.specs!==false){
-    ctx.strokeStyle='#6b5ea0'; ctx.lineWidth=1.3;
-    ctx.beginPath(); ctx.arc(s.x-3.2,hy-0.4,3.4,0,TAU); ctx.arc(s.x+3.2,hy-0.4,3.4,0,TAU);
-    ctx.moveTo(s.x-0.5,hy-0.4); ctx.lineTo(s.x+0.5,hy-0.4);
-    ctx.moveTo(s.x-6.6,hy-1.2); ctx.lineTo(s.x-8.4,hy-0.2);
-    ctx.moveTo(s.x+6.6,hy-1.2); ctx.lineTo(s.x+8.4,hy-0.2); ctx.stroke();
+  ctx.moveTo(x-15,y-6); ctx.lineTo(x-15,y-30);
+  ctx.moveTo(x+15,y-6); ctx.lineTo(x+15,y-30); ctx.stroke();
+
+  /* ---- the resident, facing you, head overlapping the roof line --------- */
+  var R=10, hy=y-26+bob;
+  var hair=s.hair||'wave', cardi=s.cardi||'#b07ec9';
+  /* shoulders, slumped */
+  poly([x-10,y-9, x+10,y-9, x+12,y-1, x-12,y-1],cardi,2.6);
+  /* ears */
+  disc(x-R-0.4,hy+1,2.6,'#ffd9b0',1.8); disc(x+R+0.4,hy+1,2.6,'#ffd9b0',1.8);
+  /* head */
+  disc(x,hy,R,'#ffd9b0',2.8);
+  /* WHITE HAIR SILHOUETTE -- the single loudest "old" cue at this size */
+  ctx.save(); ctx.beginPath(); ctx.arc(x,hy,R,0,TAU); ctx.clip();
+  ctx.fillStyle='#f2eff8';
+  if(hair==='bald'){
+    ctx.beginPath(); ctx.arc(x,hy+2,R,Math.PI*0.84,Math.PI*0.16); ctx.fill();
+  } else if(hair==='bun'){
+    ctx.beginPath(); ctx.arc(x,hy-1.5,R,Math.PI,TAU); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.arc(x,hy-1,R,Math.PI,TAU); ctx.fill();
+    ctx.fillRect(x-R,hy-R,R*2,R*0.4);
   }
-  /* nose, and a small pleased mouth */
-  ctx.strokeStyle='#e0aa80'; ctx.lineWidth=1.3;
-  ctx.beginPath(); ctx.moveTo(s.x,hy+1.2); ctx.lineTo(s.x-0.9,hy+3); ctx.stroke();
-  ctx.strokeStyle='#8a5a4a'; ctx.lineWidth=1.3;
-  ctx.beginPath(); ctx.arc(s.x,hy+3.4,2.4,0.25*Math.PI,0.75*Math.PI); ctx.stroke();
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(x,hy,R,0,TAU); ink(2.8);
+  if(hair==='bun') disc(x,hy-R-2.6,4.2,'#f2eff8',2.4);
+  if(hair==='bald'){ disc(x-R+0.6,hy-2.4,3,'#f2eff8',2.2); disc(x+R-0.6,hy-2.4,3,'#f2eff8',2.2); }
+  if(hair==='wave'){ disc(x-R+1.4,hy-4.4,3.2,'#f2eff8',2.2); disc(x+R-1.4,hy-4.4,3.2,'#f2eff8',2.2); }
+
+  /* eyes, with the heavy lids that age a face */
+  eyes(x,hy+1,4.2,3.5,1.6,0);
+  hoodedLids(x,hy+1,4.2,3.5,'#ffd9b0');
+  /* white brows */
+  ctx.strokeStyle='#e6e1ef'; ctx.lineWidth=2.2; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(x-7,hy-4.4); ctx.lineTo(x-1.6,hy-3.2);
+  ctx.moveTo(x+1.6,hy-3.2); ctx.lineTo(x+7,hy-4.4); ctx.stroke();
+  /* glasses on most of them, drawn over the eyes */
+  if(s.specs!==false){
+    ctx.strokeStyle=INK; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.arc(x-4.2,hy+1,4.2,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x+4.2,hy+1,4.2,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-0.1,hy+1); ctx.lineTo(x+0.1,hy+1);
+    ctx.moveTo(x-8.4,hy+0.2); ctx.lineTo(x-R-0.4,hy+0.6);
+    ctx.moveTo(x+8.4,hy+0.2); ctx.lineTo(x+R+0.4,hy+0.6); ctx.stroke();
+  }
+  /* a big nose and a small pleased mouth */
+  ctx.fillStyle='#f2c69c';
+  ctx.beginPath(); ctx.moveTo(x-2,hy+3.4); ctx.quadraticCurveTo(x,hy+8,x+2,hy+3.4);
+  ctx.closePath(); ctx.fill(); ink(1.6);
+  ctx.strokeStyle=INK; ctx.lineWidth=1.8;
+  ctx.beginPath(); ctx.arc(x,hy+8.4,2.6,0.18*Math.PI,0.82*Math.PI); ctx.stroke();
 
   /* what he is holding out for */
   if(s.st==='wander'||s.st==='toLure'){
-    var by=s.y-38+Math.sin(W.time*3+s.wob)*2.5;
-    ctx.fillStyle='rgba(255,255,255,.92)'; rr(ctx,s.x-15,by-13,30,25,8); ctx.fill();
-    ctx.strokeStyle='rgba(90,70,140,.4)'; ctx.lineWidth=1.5; rr(ctx,s.x-15,by-13,30,25,8); ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath();
-    ctx.moveTo(s.x-4,by+11); ctx.lineTo(s.x,by+17); ctx.lineTo(s.x+4,by+11); ctx.fill();
-    em(ctx,LURE_E[s.want],s.x,by,18);
+    var by=s.y-52+Math.sin(W.time*3+s.wob)*2.5;
+    slab(x-15,by-13,30,25,8,'#fff',2.2);
+    ctx.fillStyle='#fff'; ctx.beginPath();
+    ctx.moveTo(x-4,by+11); ctx.lineTo(x,by+17); ctx.lineTo(x+4,by+11); ctx.fill();
+    em(ctx,LURE_E[s.want],x,by,18);
   }
   if(s.say>0&&s.txt){
     ctx.font='700 11px Fredoka,sans-serif'; ctx.textAlign='center';
     var tw=ctx.measureText(s.txt).width+14;
-    ctx.fillStyle='rgba(20,16,31,.86)'; rr(ctx,s.x-tw/2,s.y-62,tw,18,8); ctx.fill();
-    ctx.fillStyle='#fff4e6'; ctx.fillText(s.txt,s.x,s.y-49);
+    slab(x-tw/2,y-74,tw,19,8,'#fff4e6',2);
+    ctx.fillStyle=INK; ctx.fillText(s.txt,x,y-60.5);
   }
 }
 
