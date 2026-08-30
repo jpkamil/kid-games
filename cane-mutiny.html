@@ -1378,8 +1378,8 @@ function updateCats(dt){
 var TASER_BARKS=['SIR.','STOP RIGHT THERE.','SIR, THE CART.','THAT IS NOT YOURS.',
   'CODE BROWN.','I AM AUTHORISED.','SIR. SIR. SIR.','THIS IS A CITIZEN\u2019S TASE.',
   'DO NOT MAKE ME JOG.','I HAVE A RADIO.'];
-var CARDIS=['#b07ec9','#7ea9d6','#d68f7e','#8cc98a','#d6b45e','#c98aa8'];
-var CARTS=['#f5f2e6','#e6eef5','#f5e6ea','#eef5e6'];
+var CARDIS=['#7d4aa8','#2f6da8','#a8452c','#3f7a44','#a8811f','#a34878'];
+var CARTS=['#ded6c4','#cfd9e2','#e0cdd2','#cfdcc6'];
 var LURE_E={candy:'🍬',catfood:'🐈',cake:'🍰'};
 function lureAmmoTotal(){ var n=0; for(var k in LURES) n+=P.ammo[k]||0; return n; }
 function updateSeniors(dt){
@@ -2152,104 +2152,99 @@ function drawFoe(f,i){
 
 function drawSenior(s){
   var bob=Math.sin(s.wob)*1.6;
-  var x=s.x, y=s.y;
+  var x=s.x, y=s.y, R=11;              /* every number below is a multiple of R */
+  var W1=0.22*R, W2=0.13*R;            /* silhouette weight / interior weight */
   shadow(x,y,s.r+4);
 
-  /* ---- the cart, rotated to where he is driving ------------------------- */
+  /* ---- the cart, rotated to where he is driving -------------------------
+     The canopy is the whole ballgame: a golf cart is a flat roof floating on
+     four skinny posts over open sides. Stroked and NOT filled, so you still
+     see the driver through it -- and drawn before him, so his head breaks the
+     roofline. A broken contour is what stops this reading as a blob in a box. */
   ctx.save(); ctx.translate(x,y); ctx.rotate(s.ang);
-  /* tiny wheels, so the body reads as riding high like a cart and not a car */
-  ctx.fillStyle=INK;
-  rr(ctx,-15,-18,9,6,2.5); ctx.fill(); rr(ctx,-15,12,9,6,2.5); ctx.fill();
-  rr(ctx,7,-18,9,6,2.5);   ctx.fill(); rr(ctx,7,12,9,6,2.5);   ctx.fill();
-  /* the deck */
-  slab(-20,-14,40,28,6,s.cart||'#f5f2e6',2.8);
-  /* open sides: a bench back at the rear, nothing along the flanks */
-  slab(-19,-11,9,22,4,'#ded7c2',2.2);
-  /* flat front and a steering wheel */
-  ctx.strokeStyle=INK; ctx.lineWidth=2.2;
-  ctx.beginPath(); ctx.arc(10,0,4.6,0,TAU); ctx.stroke();
-  /* headlights */
-  disc(19,-8,2.4,'#ffe9a8',1.6); disc(19,8,2.4,'#ffe9a8',1.6);
+  /* wheels, conspicuously too small, poking well past the tub */
+  ctx.fillStyle='#241f38';
+  rr(ctx,-1.94*R,-1.48*R,0.85*R,0.60*R,0.25*R); ctx.fill();
+  rr(ctx,-1.94*R, 0.88*R,0.85*R,0.60*R,0.25*R); ctx.fill();
+  rr(ctx, 1.09*R,-1.48*R,0.85*R,0.60*R,0.25*R); ctx.fill();
+  rr(ctx, 1.09*R, 0.88*R,0.85*R,0.60*R,0.25*R); ctx.fill();
+  /* the tub, darker than the floor so it is not a pale smear on pale grass */
+  slab(-1.70*R,-1.10*R,3.40*R,2.20*R,0.45*R,s.cart||'#ded6c4',W1);
+  /* seeing down into it is the "no doors" cue */
+  ctx.fillStyle='#b9ae99'; rr(ctx,-1.44*R,-0.84*R,2.88*R,1.68*R,0.30*R); ctx.fill();
+  /* bag rack at the back, bench across the middle */
+  slab(-1.74*R,-0.56*R,0.48*R,1.12*R,0.14*R,'#3a3357',W2);
+  slab(-1.00*R,-0.80*R,0.58*R,1.60*R,0.20*R,'#8a8170',W2);
+  ctx.strokeStyle=INK; ctx.lineWidth=W2;
+  ctx.beginPath(); ctx.arc(0.95*R,0,0.34*R,0,TAU); ctx.stroke();
   /* Every one of them has had the left indicator on since about 1997.
      Nobody in this building is going to mention it. */
-  disc(17,-13,2.5,(Math.floor(W.time*1.7+s.wob)%2===0)?'#ffa62b':'#6d5c3e',1.6);
-  /* the bag rack, and the flag every one of these has */
-  ctx.strokeStyle=INK; ctx.lineWidth=2.2;
-  ctx.beginPath(); ctx.moveTo(-21,-6); ctx.lineTo(-26,-6);
-  ctx.moveTo(-21,6); ctx.lineTo(-26,6); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(-30,0); ctx.stroke();
-  poly([-30,0, -30,-8, -23,-4],'#8ce34f',2);
+  disc(1.55*R,-1.02*R,0.22*R,(Math.floor(W.time*1.7+s.wob)%2===0)?'#ffa62b':'#6d5c3e',1.5);
+  /* the four roof posts, then the roof itself */
+  ctx.fillStyle=INK;
+  ctx.fillRect(-1.73*R,-1.15*R,0.26*R,0.26*R); ctx.fillRect(-1.73*R,0.89*R,0.26*R,0.26*R);
+  ctx.fillRect( 1.47*R,-1.15*R,0.26*R,0.26*R); ctx.fillRect( 1.47*R,0.89*R,0.26*R,0.26*R);
+  rr(ctx,-1.86*R,-1.26*R,3.72*R,2.52*R,0.50*R); ink(W1);
   ctx.restore();
 
-  /* ---- the roof, drawn unrotated so it always reads as a canopy --------- */
-  ctx.strokeStyle=INK; ctx.lineWidth=2.4; ctx.lineCap='round';
-  ctx.beginPath();
-  ctx.moveTo(x-15,y-6); ctx.lineTo(x-15,y-30);
-  ctx.moveTo(x+15,y-6); ctx.lineTo(x+15,y-30); ctx.stroke();
-
-  /* ---- the resident, facing you, head overlapping the roof line --------- */
-  var R=10, hy=y-26+bob;
-  var hair=s.hair||'wave', cardi=s.cardi||'#b07ec9';
-  /* shoulders, slumped */
-  poly([x-10,y-9, x+10,y-9, x+12,y-1, x-12,y-1],cardi,2.6);
-  /* ears */
-  disc(x-R-0.4,hy+1,2.6,'#ffd9b0',1.8); disc(x+R+0.4,hy+1,2.6,'#ffd9b0',1.8);
-  /* head */
-  disc(x,hy,R,'#ffd9b0',2.8);
-  /* WHITE HAIR SILHOUETTE -- the single loudest "old" cue at this size */
-  ctx.save(); ctx.beginPath(); ctx.arc(x,hy,R,0,TAU); ctx.clip();
-  ctx.fillStyle='#f2eff8';
+  /* ---- the resident, facing you, head over the roofline ----------------- */
+  var HY=y-1.28*R;
+  var hair=s.hair||'wave', cardi=s.cardi||'#7d4aa8';
+  /* sloped shoulders, set low, no neck -- he sinks into his own cardigan */
+  slab(x-0.86*R,HY+0.34*R,1.72*R,1.26*R,0.46*R,cardi,W1);
+  /* the jowl goes on BEFORE the head so the two fuse into one bottom-heavy
+     silhouette. A clean circle reads as a child; a weighted chin reads as old. */
+  ctx.beginPath(); ctx.ellipse(x,HY+0.54*R,0.72*R,0.50*R,0,0,TAU);
+  ctx.fillStyle='#f0c391'; ctx.fill(); ink(W1);
+  disc(x-0.98*R,HY+0.10*R,0.26*R,'#f0c391',W2);
+  disc(x+0.98*R,HY+0.10*R,0.26*R,'#f0c391',W2);
+  disc(x,HY,R,'#f0c391',W1);
+  /* WHITE HAIR AS AN OUTLINED MASS -- the loudest "old" cue there is, and it
+     only works if a dark line separates it from the pale world behind. */
   if(hair==='bald'){
-    ctx.beginPath(); ctx.arc(x,hy+2,R,Math.PI*0.84,Math.PI*0.16); ctx.fill();
-  } else if(hair==='bun'){
-    ctx.beginPath(); ctx.arc(x,hy-1.5,R,Math.PI,TAU); ctx.fill();
+    disc(x-0.94*R,HY-0.20*R,0.42*R,'#fff',W1);
+    disc(x+0.94*R,HY-0.20*R,0.42*R,'#fff',W1);
+    halfDisc(x,HY-0.10*R,1.06*R,0.84*Math.PI,1.16*Math.PI,'#fff',W1);
   } else {
-    ctx.beginPath(); ctx.arc(x,hy-1,R,Math.PI,TAU); ctx.fill();
-    ctx.fillRect(x-R,hy-R,R*2,R*0.4);
+    halfDisc(x,HY-0.18*R,1.14*R,Math.PI,TAU,'#fff',W1);
+    disc(x-0.92*R,HY-0.26*R,0.40*R,'#fff',W1);
+    disc(x+0.92*R,HY-0.26*R,0.40*R,'#fff',W1);
+    if(hair==='bun') disc(x,HY-1.34*R,0.42*R,'#fff',W1);
   }
-  ctx.restore();
-  ctx.beginPath(); ctx.arc(x,hy,R,0,TAU); ink(2.8);
-  if(hair==='bun') disc(x,hy-R-2.6,4.2,'#f2eff8',2.4);
-  if(hair==='bald'){ disc(x-R+0.6,hy-2.4,3,'#f2eff8',2.2); disc(x+R-0.6,hy-2.4,3,'#f2eff8',2.2); }
-  if(hair==='wave'){ disc(x-R+1.4,hy-4.4,3.2,'#f2eff8',2.2); disc(x+R-1.4,hy-4.4,3.2,'#f2eff8',2.2); }
-
-  /* eyes, with the heavy lids that age a face */
-  eyes(x,hy+1,4.2,3.5,1.6,0);
-  hoodedLids(x,hy+1,4.2,3.5,'#ffd9b0');
-  /* white brows */
-  ctx.strokeStyle='#e6e1ef'; ctx.lineWidth=2.2; ctx.lineCap='round';
+  /* One heavy brow shelf, not two hairs. It sits on skin, above the lenses. */
+  ctx.strokeStyle='#efe9f6'; ctx.lineWidth=0.17*R; ctx.lineCap='round';
   ctx.beginPath();
-  ctx.moveTo(x-7,hy-4.4); ctx.lineTo(x-1.6,hy-3.2);
-  ctx.moveTo(x+1.6,hy-3.2); ctx.lineTo(x+7,hy-4.4); ctx.stroke();
-  /* glasses on most of them, drawn over the eyes */
-  if(s.specs!==false){
-    ctx.strokeStyle=INK; ctx.lineWidth=1.8;
-    ctx.beginPath(); ctx.arc(x-4.2,hy+1,4.2,0,TAU); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x+4.2,hy+1,4.2,0,TAU); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x-0.1,hy+1); ctx.lineTo(x+0.1,hy+1);
-    ctx.moveTo(x-8.4,hy+0.2); ctx.lineTo(x-R-0.4,hy+0.6);
-    ctx.moveTo(x+8.4,hy+0.2); ctx.lineTo(x+R+0.4,hy+0.6); ctx.stroke();
-  }
-  /* a big nose and a small pleased mouth */
-  ctx.fillStyle='#f2c69c';
-  ctx.beginPath(); ctx.moveTo(x-2,hy+3.4); ctx.quadraticCurveTo(x,hy+8,x+2,hy+3.4);
-  ctx.closePath(); ctx.fill(); ink(1.6);
-  ctx.strokeStyle=INK; ctx.lineWidth=1.8;
-  ctx.beginPath(); ctx.arc(x,hy+8.4,2.6,0.18*Math.PI,0.82*Math.PI); ctx.stroke();
+  ctx.moveTo(x-0.60*R,HY-0.30*R); ctx.lineTo(x-0.10*R,HY-0.24*R);
+  ctx.moveTo(x+0.10*R,HY-0.24*R); ctx.lineTo(x+0.60*R,HY-0.30*R); ctx.stroke();
+  /* THE EYES ARE THE GLASSES. At a face this small a lens ring and an eye white
+     fight for the same pixels and both lose, so one shape does both jobs: a
+     white disc with a heavy dark rim reads as spectacles and as an eye. */
+  disc(x-0.37*R,HY+0.02*R,0.33*R,'#fff',0.15*R);
+  disc(x+0.37*R,HY+0.02*R,0.33*R,'#fff',0.15*R);
+  ctx.strokeStyle=INK; ctx.lineWidth=W2;
+  ctx.beginPath(); ctx.moveTo(x-0.08*R,HY+0.02*R); ctx.lineTo(x+0.08*R,HY+0.02*R);
+  ctx.moveTo(x-0.70*R,HY-0.02*R); ctx.lineTo(x-1.00*R,HY+0.06*R);
+  ctx.moveTo(x+0.70*R,HY-0.02*R); ctx.lineTo(x+1.00*R,HY+0.06*R); ctx.stroke();
+  ctx.fillStyle=INK;
+  ctx.beginPath(); ctx.arc(x-0.37*R,HY+0.03*R,0.12*R,0,TAU);
+  ctx.arc(x+0.37*R,HY+0.03*R,0.12*R,0,TAU); ctx.fill();
+  /* the entire mouth vocabulary available at this size */
+  ctx.fillStyle=INK;
+  rr(ctx,x-0.26*R,HY+0.66*R,0.52*R,0.16*R,0.08*R); ctx.fill();
 
-  /* what he is holding out for */
+  /* what he is holding out for. Sized so it never outshouts his head. */
   if(s.st==='wander'||s.st==='toLure'){
-    var by=s.y-52+Math.sin(W.time*3+s.wob)*2.5;
-    slab(x-15,by-13,30,25,8,'#fff',2.2);
+    var by=y-3.9*R+Math.sin(W.time*3+s.wob)*2.5;
+    slab(x-0.95*R,by-0.80*R,1.90*R,1.60*R,0.55*R,'#fff',W2);
     ctx.fillStyle='#fff'; ctx.beginPath();
-    ctx.moveTo(x-4,by+11); ctx.lineTo(x,by+17); ctx.lineTo(x+4,by+11); ctx.fill();
-    em(ctx,LURE_E[s.want],x,by,18);
+    ctx.moveTo(x-3.4,by+0.80*R); ctx.lineTo(x,by+1.34*R); ctx.lineTo(x+3.4,by+0.80*R); ctx.fill();
+    em(ctx,LURE_E[s.want],x,by,0.92*R);
   }
   if(s.say>0&&s.txt){
     ctx.font='700 11px Fredoka,sans-serif'; ctx.textAlign='center';
     var tw=ctx.measureText(s.txt).width+14;
-    slab(x-tw/2,y-74,tw,19,8,'#fff4e6',2);
-    ctx.fillStyle=INK; ctx.fillText(s.txt,x,y-60.5);
+    slab(x-tw/2,y-5.6*R,tw,19,8,'#fff4e6',2);
+    ctx.fillStyle=INK; ctx.fillText(s.txt,x,y-5.6*R+13.5);
   }
 }
 
