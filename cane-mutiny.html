@@ -1894,7 +1894,8 @@ function finishPhase(){
   if(PHASE==='store'){ brief('home'); }
   else if(PHASE==='home'){ brief('escape'); }
   else { ROUND++; STATS.rounds=Math.max(STATS.rounds,ROUND-1);
-         if(COINS>BEST){BEST=COINS;LS.set('cm_best',String(BEST));}
+         /* lifetime earned, not what is left in her pocket -- see addCoins */
+         if(STATS.coins>BEST){BEST=STATS.coins;LS.set('cm_best',String(BEST));}
          openShop(); }
 }
 
@@ -2883,7 +2884,7 @@ function menu(){
       '<div class="difflbl" id="mDiffN">'+peppers(DIFF)+'</div>'+
       '<div class="diffdesc" id="mDiffD">'+DIFF.d+'</div>'+
     '</div>'+
-    '<div class="tag" style="margin-top:12px">Best purse: <b style="color:var(--sun)">'+BEST+'</b> coins</div>'
+    '<div class="tag" style="margin-top:12px">Best total take: <b style="color:var(--sun)">'+BEST+'</b> coins</div>'
   );
   on('mPlay',function(){ startGame(); });
   /* live-updated in place rather than rebuilding the menu, so the thumb stays
@@ -3009,7 +3010,7 @@ function togglePause(){
 
 function gameOver(){
   GEN++; SCENE='over'; paused=false; elHud.hidden=true; SFX.jail(); musForScene();
-  if(COINS>BEST){ BEST=COINS; LS.set('cm_best',String(BEST)); }
+  if(STATS.coins>BEST){ BEST=STATS.coins; LS.set('cm_best',String(BEST)); }
   var lines=[
     '“He was carrying a watermelon and eleven pounds of gummy bears.”',
     '“He had a golf cart conga line. Nine residents. Nine.”',
@@ -3030,8 +3031,8 @@ function gameOver(){
       '<div class="stat"><span>Guards ejected</span><b>'+STATS.ejected+'</b></div>'+
       '<div class="stat"><span>Things thrown</span><b>'+STATS.thrown+'</b></div>'+
       '<div class="stat"><span>Secret boxes found</span><b>'+STATS.boxes+'</b></div>'+
-      '<div class="stat"><span>Coins earned</span><b>'+STATS.coins+'</b></div>'+
-      '<div class="stat"><span>Best purse ever</span><b>'+BEST+'</b></div>'+
+      '<div class="stat"><span>Total take this run</span><b>'+STATS.coins+'</b></div>'+
+      '<div class="stat"><span>Best total take ever</span><b>'+BEST+'</b></div>'+
     '</div>'+
     '<div class="rowbtns"><button class="btn go" id="oAgain">ONE MORE</button>'+
     '<button class="btn ghost" id="oMenu">MENU</button></div>'
