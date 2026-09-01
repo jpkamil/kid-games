@@ -645,63 +645,123 @@ function drawCar(x,y,w,t,tilt){
   ctx.restore();
 }
 
-/* ---------------------------- grown-ups ----------------------------------- */
-/* Recipients: mom, dad, grandma, teacher, brothers, friend. */
+/* ---------------------------- the people ---------------------------------- */
+/* Recipients: mum, dad, grandma, teacher, the brothers, a friend.  Trousers or a
+   dress, never a dress by default -- the old version put Daddy in a skirt. */
 function drawPerson(x,y,size,kind,t,happy){
   ctx.save(); ctx.translate(x,y);
-  var bob = Math.sin(t*3)*size*0.05;
-  ctx.translate(0,bob);
-  var hair = kind.hair, dress = kind.dress;
+  ctx.translate(0, Math.sin(t*3)*size*0.05);
+  if(kind.shorter) ctx.translate(0, size*0.22);
+
+  var S       = kind.skin || C.skin;
   var bodyTop = size*0.85;
+  var hipY    = bodyTop + size*1.05;
+  var footY   = bodyTop + size*2.50;   /* same for trousers and dresses, so the
+                                          delivery scene can stand anyone on the grass */
 
-  /* hair behind */
-  ctx.fillStyle = kind.hairDark || hair;
-  ctx.beginPath();
-  ctx.ellipse(0, size*(kind.longHair?0.9:0.35), size*1.2, size*(kind.longHair?1.7:1.15), 0,0,TAU);
-  ctx.fill();
-
-  /* body */
-  ctx.fillStyle = dress;
-  ctx.beginPath();
-  ctx.moveTo(-size*0.62, bodyTop); ctx.lineTo(size*0.62, bodyTop);
-  ctx.lineTo(size*1.25, bodyTop+size*1.9); ctx.lineTo(-size*1.25, bodyTop+size*1.9);
-  ctx.closePath(); ctx.fill();
-  if(kind.apron){
-    ctx.fillStyle='rgba(255,255,255,0.6)';
-    ctx.beginPath();
-    ctx.moveTo(-size*0.34,bodyTop+size*0.1); ctx.lineTo(size*0.34,bodyTop+size*0.1);
-    ctx.lineTo(size*0.72,bodyTop+size*1.85); ctx.lineTo(-size*0.72,bodyTop+size*1.85);
-    ctx.closePath(); ctx.fill();
+  /* ---- hair behind the head ---- */
+  ctx.fillStyle = kind.hairDark || kind.hair;
+  if(kind.longHair){
+    ctx.beginPath(); ctx.ellipse(0, size*0.90, size*1.20, size*1.70, 0,0,TAU); ctx.fill();
+  } else if(kind.bob){
+    ctx.beginPath(); ctx.ellipse(0, size*0.22, size*1.16, size*1.12, 0,0,TAU); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.ellipse(0, size*0.10, size*1.10, size*1.02, 0,0,TAU); ctx.fill();
   }
-  /* legs + shoes */
-  ctx.fillStyle=kind.skin||C.skin;
-  rr(-size*0.6, bodyTop+size*1.8, size*0.42, size*0.8, size*0.2); ctx.fill();
-  rr( size*0.18, bodyTop+size*1.8, size*0.42, size*0.8, size*0.2); ctx.fill();
-  ctx.fillStyle=kind.shoe||'#6b5b95';
-  rr(-size*0.72, bodyTop+size*2.5, size*0.66, size*0.32, size*0.15); ctx.fill();
-  rr( size*0.06, bodyTop+size*2.5, size*0.66, size*0.32, size*0.15); ctx.fill();
-  /* arms out, ready to receive */
-  ctx.strokeStyle=kind.skin||C.skin; ctx.lineWidth=size*0.34; ctx.lineCap='round';
-  var a = happy? -1.05 : -0.45;
-  ctx.beginPath(); ctx.moveTo(-size*0.56,bodyTop+size*0.3);
-  ctx.lineTo(-size*0.56-Math.cos(a)*size*1.05, bodyTop+size*0.3+Math.sin(a)*size*1.05); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo( size*0.56,bodyTop+size*0.3);
-  ctx.lineTo( size*0.56+Math.cos(a)*size*1.05, bodyTop+size*0.3+Math.sin(a)*size*1.05); ctx.stroke();
 
-  /* head */
-  fillCircle(0,0,size,kind.skin||C.skin);
-  /* hair front */
-  ctx.fillStyle=hair;
+  /* ---- body ---- */
+  if(kind.pants){
+    ctx.fillStyle = kind.pants;
+    rr(-size*0.70, hipY, size*0.62, size*1.45, size*0.16); ctx.fill();
+    rr( size*0.08, hipY, size*0.62, size*1.45, size*0.16); ctx.fill();
+    ctx.fillStyle = kind.shirt;
+    rr(-size*0.78, bodyTop, size*1.56, size*1.30, size*0.24); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(-size*0.30, bodyTop); ctx.lineTo(size*0.30, bodyTop);
+    ctx.lineTo(0, bodyTop+size*0.40); ctx.closePath(); ctx.fill();
+    if(kind.belt){
+      ctx.fillStyle = kind.belt;
+      rr(-size*0.74, hipY-size*0.14, size*1.48, size*0.24, size*0.09); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = kind.dress;
+    ctx.beginPath();
+    ctx.moveTo(-size*0.62, bodyTop); ctx.lineTo(size*0.62, bodyTop);
+    ctx.lineTo(size*1.25, bodyTop+size*1.90); ctx.lineTo(-size*1.25, bodyTop+size*1.90);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath(); ctx.ellipse(0, bodyTop+size*1.80, size*1.10, size*0.26, 0,0,TAU); ctx.fill();
+    if(kind.cardigan){
+      /* an open cardigan with buttons down the front */
+      ctx.fillStyle = kind.cardigan;
+      ctx.beginPath();
+      ctx.moveTo(-size*0.66, bodyTop-size*0.04); ctx.lineTo(-size*0.16, bodyTop-size*0.04);
+      ctx.lineTo(-size*0.34, bodyTop+size*1.55); ctx.lineTo(-size*1.02, bodyTop+size*1.55);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo( size*0.66, bodyTop-size*0.04); ctx.lineTo( size*0.16, bodyTop-size*0.04);
+      ctx.lineTo( size*0.34, bodyTop+size*1.55); ctx.lineTo( size*1.02, bodyTop+size*1.55);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = kind.buttons || '#e6c9f2';
+      for(var bt=0; bt<3; bt++) fillCircle(0, bodyTop+size*(0.34+bt*0.42), size*0.09, kind.buttons);
+    }
+    if(kind.belt){
+      ctx.fillStyle = kind.belt;
+      rr(-size*0.86, bodyTop+size*0.80, size*1.72, size*0.22, size*0.09); ctx.fill();
+      fillCircle(0, bodyTop+size*0.91, size*0.13, 'rgba(255,255,255,0.75)');
+    }
+    if(kind.apron){
+      ctx.fillStyle='rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.moveTo(-size*0.34,bodyTop+size*0.10); ctx.lineTo(size*0.34,bodyTop+size*0.10);
+      ctx.lineTo(size*0.72,bodyTop+size*1.80); ctx.lineTo(-size*0.72,bodyTop+size*1.80);
+      ctx.closePath(); ctx.fill();
+    }
+    /* bare legs under the hem */
+    ctx.fillStyle = S;
+    rr(-size*0.60, bodyTop+size*1.80, size*0.42, size*0.80, size*0.20); ctx.fill();
+    rr( size*0.18, bodyTop+size*1.80, size*0.42, size*0.80, size*0.20); ctx.fill();
+  }
+  if(kind.collar){
+    ctx.fillStyle = kind.collar;
+    ctx.beginPath(); ctx.ellipse(-size*0.26, bodyTop+size*0.06, size*0.30, size*0.16, -0.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( size*0.26, bodyTop+size*0.06, size*0.30, size*0.16,  0.5,0,TAU); ctx.fill();
+  }
+
+  /* ---- shoes ---- */
+  ctx.fillStyle = kind.shoe || '#6b5b95';
+  rr(-size*0.72, footY, size*0.66, size*0.32, size*0.15); ctx.fill();
+  rr( size*0.06, footY, size*0.66, size*0.32, size*0.15); ctx.fill();
+
+  /* ---- head ---- */
+  fillCircle(0,0,size,S);
+  ctx.fillStyle = kind.hair;
   ctx.beginPath();
   ctx.arc(0,0,size*1.05, Math.PI*1.0, Math.PI*2.0);
   ctx.quadraticCurveTo(0,-size*0.28, -size*1.05, -size*0.05);
   ctx.closePath(); ctx.fill();
-  if(kind.bun){ fillCircle(0,-size*1.15,size*0.45,hair); }
-  if(kind.pigtails){ fillCircle(-size*1.05,-size*0.05,size*0.42,hair); fillCircle(size*1.05,-size*0.05,size*0.42,hair); }
-  if(kind.cap){ ctx.fillStyle=kind.cap; ctx.beginPath(); ctx.arc(0,-size*0.1,size*1.04,Math.PI,TAU); ctx.fill();
-    rr(-size*1.1,-size*0.18,size*2.2,size*0.2,size*0.1); ctx.fill(); }
+  if(kind.bob){
+    /* two soft lengths framing the jaw -- clearly shorter than Nina's */
+    ctx.beginPath(); ctx.ellipse(-size*0.98, size*0.22, size*0.32, size*0.72, 0.10,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( size*0.98, size*0.22, size*0.32, size*0.72,-0.10,0,TAU); ctx.fill();
+  }
+  if(kind.bun){ fillCircle(0,-size*1.15,size*0.45,kind.hair); }
+  if(kind.curls){
+    /* soft grey curls around the hairline */
+    for(var cu=0; cu<7; cu++){
+      var ca = Math.PI*1.06 + cu*(Math.PI*0.88/6);
+      fillCircle(Math.cos(ca)*size*1.00, Math.sin(ca)*size*1.00, size*0.26, kind.hair);
+    }
+  }
+  if(kind.pigtails){ fillCircle(-size*1.05,-size*0.05,size*0.42,kind.hair); fillCircle(size*1.05,-size*0.05,size*0.42,kind.hair); }
+  if(kind.cap){
+    ctx.fillStyle=kind.cap; ctx.beginPath(); ctx.arc(0,-size*0.10,size*1.04,Math.PI,TAU); ctx.fill();
+    rr(-size*1.10,-size*0.18,size*2.20,size*0.20,size*0.10); ctx.fill();
+    rr(-size*1.30,-size*0.20,size*1.00,size*0.22,size*0.11); ctx.fill();
+  }
 
-  /* face */
+  /* ---- face ---- */
   fillCircle(-size*0.33,-size*0.06,size*0.14,C.ink);
   fillCircle( size*0.33,-size*0.06,size*0.14,C.ink);
   fillCircle(-size*0.28,-size*0.12,size*0.055,C.white);
@@ -712,13 +772,49 @@ function drawPerson(x,y,size,kind,t,happy){
     circle( size*0.33,-size*0.06,size*0.28); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(-size*0.05,-size*0.06); ctx.lineTo(size*0.05,-size*0.06); ctx.stroke();
   }
-  fillCircle(-size*0.6, size*0.22, size*0.15, 'rgba(255,140,180,0.45)');
-  fillCircle( size*0.6, size*0.22, size*0.15, 'rgba(255,140,180,0.45)');
+  fillCircle(-size*0.60, size*0.22, size*0.15, 'rgba(255,140,180,0.45)');
+  fillCircle( size*0.60, size*0.22, size*0.15, 'rgba(255,140,180,0.45)');
   ctx.strokeStyle=C.ink; ctx.lineWidth=size*0.10; ctx.lineCap='round';
   ctx.beginPath();
   if(happy) ctx.arc(0,size*0.14,size*0.40, 0.25, Math.PI-0.25);
   else      ctx.arc(0,size*0.16,size*0.30, 0.45, Math.PI-0.45);
   ctx.stroke();
+
+  /* ---- accessories that sit in front of the hair ---- */
+  if(kind.earring){
+    for(var e=-1;e<=1;e+=2){
+      var exx = e*size*1.02;
+      fillCircle(exx, size*0.30, size*0.07, '#f0b429');
+      ctx.strokeStyle='#f0b429'; ctx.lineWidth=size*0.05;
+      ctx.beginPath(); ctx.moveTo(exx, size*0.32); ctx.lineTo(exx, size*0.52); ctx.stroke();
+      drawHeart(exx, size*0.70, size*0.26, kind.earring);
+      ctx.fillStyle='rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.ellipse(exx-size*0.08, size*0.60, size*0.07, size*0.05, -0.5,0,TAU); ctx.fill();
+    }
+  }
+  if(kind.necklace){
+    for(var p=0;p<7;p++){
+      var na = Math.PI*0.30 + p*(Math.PI*0.40/6);
+      var nx = Math.cos(na)*size*1.02, ny = size*0.30 + Math.sin(na)*size*0.92;
+      fillCircle(nx, ny, size*0.105, 'rgba(120,95,130,0.35)');
+      fillCircle(nx, ny, size*0.085, kind.necklace);
+      fillCircle(nx-size*0.025, ny-size*0.025, size*0.032, 'rgba(255,255,255,0.9)');
+    }
+  }
+
+  /* ---- arms last, or the hair swallows them ---- */
+  var armA = happy? -0.95 : -0.45;
+  var asx = size*0.72, asy = bodyTop+size*0.30, alen = size*1.15;
+  var aex = Math.cos(armA)*alen, aey = Math.sin(armA)*alen;
+  ctx.strokeStyle = kind.pants? kind.shirt : (kind.cardigan || S);
+  ctx.lineWidth = size*0.32; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-asx,asy); ctx.lineTo(-asx-aex*0.55, asy+aey*0.55); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( asx,asy); ctx.lineTo( asx+aex*0.55, asy+aey*0.55); ctx.stroke();
+  ctx.strokeStyle = S; ctx.lineWidth = size*0.28;
+  ctx.beginPath(); ctx.moveTo(-asx-aex*0.5, asy+aey*0.5); ctx.lineTo(-asx-aex, asy+aey); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( asx+aex*0.5, asy+aey*0.5); ctx.lineTo( asx+aex, asy+aey); ctx.stroke();
+  fillCircle(-asx-aex, asy+aey, size*0.20, S);
+  fillCircle( asx+aex, asy+aey, size*0.20, S);
   ctx.restore();
 }
 
@@ -804,6 +900,7 @@ var G = {
   best:  parseInt(LS.get('nina_best')||'0',10)  || 0,
   stickers: (LS.get('nina_stickers')||'').split(',').filter(Boolean),
   roundIndex: parseInt(LS.get('nina_round')||'0',10) || 0,
+  garden: null,          /* [{stage, col}] x4 -- survives between visits */
   wordIndex: parseInt(LS.get('nina_word')||'0',10) || 0,
   personIndex: parseInt(LS.get('nina_person')||'0',10) || 0
 };
@@ -811,6 +908,29 @@ function addStars(n){
   G.stars += n;
   if(G.stars > G.best){ G.best = G.stars; LS.set('nina_best', G.best); }
   LS.set('nina_stars', G.stars);
+}
+/* The garden grows one step per visit, so it has to outlive the round. */
+function loadGarden(){
+  var raw = (LS.get('nina_garden')||'').split(',').filter(function(x){ return x.length; });
+  var g = [], i;
+  for(i=0;i<4;i++){
+    var parts = (raw[i]||'').split(':');
+    var st = parseInt(parts[0],10), ci = parseInt(parts[1],10);
+    g.push({ stage: (st>=0 && st<=3)? st : 0,
+             col: FLOWER_COLORS[(ci>=0 && ci<FLOWER_COLORS.length)? ci : rndi(0,FLOWER_COLORS.length-1)] });
+  }
+  return g;
+}
+function saveGarden(){
+  if(!G.garden) return;
+  LS.set('nina_garden', G.garden.map(function(p){
+    return p.stage + ':' + FLOWER_COLORS.indexOf(p.col);
+  }).join(','));
+}
+function resetGarden(){
+  G.garden = [];
+  for(var i=0;i<4;i++) G.garden.push({ stage:0, col: FLOWER_COLORS[rndi(0,FLOWER_COLORS.length-1)] });
+  saveGarden();
 }
 function saveProgress(){
   LS.set('nina_round', G.roundIndex);
@@ -820,13 +940,25 @@ function saveProgress(){
 }
 
 var PEOPLE = [
-  {id:'mom',     label:'Mommy',   hair:'#7b4a24', hairDark:'#5e3418', longHair:true, dress:'#ff8fc0', shoe:'#e0498d'},
-  {id:'grandma', label:'Grandma', hair:'#d8d8e0', hairDark:'#c2c2cc', bun:true, glasses:true, dress:'#b98bff', shoe:'#8f5fe0', apron:true},
-  {id:'dad',     label:'Daddy',   hair:'#4a3020', hairDark:'#3a2416', dress:'#6fc9ff', shoe:'#3f7fa8', cap:'#4aa3e0'},
-  {id:'teacher', label:'my teacher', hair:'#3a2a1a', hairDark:'#2a1c10', bun:true, glasses:true, dress:'#7ee0a8', shoe:'#3fa870'},
-  {id:'theo',    label:'Theo',    hair:'#6b4020', hairDark:'#4e2e14', dress:'#ffd93d', shoe:'#e8b800', kid:true},
-  {id:'oliver',  label:'Oliver',  hair:'#8a5a2e', hairDark:'#6a4020', dress:'#ff9d5c', shoe:'#e07a2a', kid:true},
-  {id:'mia',     label:'my friend Mia', hair:'#2a1a10', hairDark:'#1a1008', pigtails:true, dress:'#ffb3d9', shoe:'#ff5fa3', kid:true}
+  /* Mummy: shorter hair than Nina, her own outfit, heart earrings -- she used to
+     read as simply a bigger Nina. */
+  {id:'mom',     label:'Mommy',   hair:'#7b4a24', hairDark:'#5e3418', bob:true,
+                 dress:'#3fbfa8', collar:'#eafaf6', belt:'#f0b429', earring:'#ff4f95',
+                 shoe:'#e0498d'},
+  {id:'grandma', label:'Grandma', hair:'#e2e2ec', hairDark:'#c8c8d6', bun:true, curls:true,
+                 glasses:true, dress:'#c9a7e8', cardigan:'#f7d9e8', buttons:'#fff6fb',
+                 necklace:'#ffd873', shoe:'#8f5fe0', shorter:true},
+  {id:'dad',     label:'Daddy',   hair:'#4a3020', hairDark:'#3a2416',
+                 shirt:'#6fc9ff', pants:'#3d5f86', belt:'#2b4360', cap:'#4aa3e0',
+                 shoe:'#2f4256'},
+  {id:'teacher', label:'my teacher', hair:'#3a2a1a', hairDark:'#2a1c10', bun:true, glasses:true,
+                 dress:'#7ee0a8', collar:'#ffffff', belt:'#3fa870', shoe:'#3fa870'},
+  {id:'theo',    label:'Theo',    hair:'#6b4020', hairDark:'#4e2e14', kid:true,
+                 shirt:'#ffd93d', pants:'#8a5a3a', shoe:'#5e3d26'},
+  {id:'oliver',  label:'Oliver',  hair:'#8a5a2e', hairDark:'#6a4020', kid:true,
+                 shirt:'#ff9d5c', pants:'#4a7fb5', shoe:'#33587f'},
+  {id:'mia',     label:'my friend Mia', hair:'#2a1a10', hairDark:'#1a1008', pigtails:true,
+                 kid:true, dress:'#ffb3d9', collar:'#ffffff', shoe:'#ff5fa3'}
 ];
 
 var WORDS = ['NINA','CAT','DOG','MOM','DAD','SUN','THEO','BUS','OLIVER'];
@@ -1199,22 +1331,26 @@ var Garden = (function(){
   }
 
   function enter(){
-    s = { plots:[], canX:W*0.18, canY:H*0.26, tip:0, pouring:false, done:false, doneT:0, hint:1 };
+    if(!G.garden) G.garden = loadGarden();
+    /* everything bloomed last time -- clear the beds and start fresh seeds */
+    if(G.garden.every(function(p){ return p.stage>=3; })) resetGarden();
+
+    var startStage = Math.min.apply(null, G.garden.map(function(p){ return p.stage; }));
+    s = { plots:[], canX:W*0.18, canY:H*0.26, tip:0, pouring:false, done:false, doneT:0,
+          hint:1, target: Math.min(3, startStage+1), startStage: startStage };
     for(var i=0;i<4;i++){
-      s.plots.push({ x:0,y:0,r:20, stage:0, water:0, col:FLOWER_COLORS[i%FLOWER_COLORS.length],
-        pop:0, ph:rnd(0,TAU) });
+      s.plots.push({ x:0, y:0, r:20, stage:G.garden[i].stage, water:0,
+                     col:G.garden[i].col, pop:0, ph:rnd(0,TAU) });
     }
-    /* shuffle the colours so it isn't the same four every time */
-    for(var j=0;j<s.plots.length;j++) s.plots[j].col = FLOWER_COLORS[(j + rndi(0,6))%FLOWER_COLORS.length];
     layout();
-    Voice.say('water');
+    Voice.say(startStage===0? 'water' : 'g_again');
   }
   function onResize(){ if(s) layout(); }
 
   function update(dt, t){
     if(s.done){
       s.doneT += dt; updateParts(dt);
-      if(s.doneT>2.6) Scene.go('cheer',{kind:'garden'});
+      if(s.doneT>2.6) Scene.go('cheer',{kind:'garden', target:s.target});
       return;
     }
     var tx = P.down ? P.x : W*0.18;
@@ -1228,7 +1364,7 @@ var Garden = (function(){
     if(P.down){
       for(var i=0;i<s.plots.length;i++){
         var p=s.plots[i];
-        if(p.stage>=3) continue;
+        if(p.stage>=s.target) continue;      /* already grown as far as it goes today */
         if(dist2(spx, spy, p.x, p.y - p.r*0.6) < (p.r*1.55)*(p.r*1.55)){ over=p; break; }
       }
     }
@@ -1245,6 +1381,8 @@ var Garden = (function(){
       if(Math.random()<dt*8) Audio2.sfx.water();
       if(over.water >= STAGE_WATER){
         over.water = 0; over.stage++; over.pop = 1;
+        G.garden[s.plots.indexOf(over)].stage = over.stage;
+        saveGarden();
         if(over.stage>=3){
           Audio2.sfx.bloom();
           burst(over.x, over.y - over.r*1.9, 22, over.col.hex, {kind:'petal', up:170, g:340});
@@ -1252,7 +1390,7 @@ var Garden = (function(){
           G.bouquet.push(over.col);
           addStars(5);
           Voice.say('c_'+over.col.name);
-          var allDone = s.plots.every(function(q){ return q.stage>=3; });
+          var allDone = s.plots.every(function(q){ return q.stage>=s.target; });
           if(allDone){
             s.done = true; s.doneT = 0;
             setTimeout(function(){ Audio2.sfx.happy(); }, 500);
@@ -1264,7 +1402,18 @@ var Garden = (function(){
           }
         } else {
           Audio2.sfx.grow(over.stage-1);
+          addStars(2);            /* a sprout is progress too -- the counter must move */
           burst(over.x, over.y - over.r*0.9, 8, '#8ee87a', {up:110, g:400});
+          if(s.plots.every(function(q){ return q.stage>=s.target; })){
+            s.done = true; s.doneT = 0;
+            Voice.say(s.target===1? 'g_sprout' : 'g_bud');
+            setTimeout(function(){ Audio2.sfx.happy(); }, 500);
+            for(var k2=0;k2<24;k2++){
+              spawnPart({x:rnd(0,W), y:rnd(-H*0.25,0), vx:rnd(-40,40), vy:rnd(70,190), g:130,
+                life:rnd(1.6,2.8), r:rnd(U*0.8,U*1.7), col:'#8ee87a',
+                kind:'petal', spin:rnd(0,TAU), vs:rnd(-4,4)});
+            }
+          }
         }
       }
     }
@@ -1351,7 +1500,7 @@ var Garden = (function(){
     ctx.restore();
 
     /* growth meter -- a little water bar under the pot */
-    if(p.stage<3 && p.water>0){
+    if(p.stage<s.target && p.water>0){
       var bw = r*1.5, bh = r*0.20, bx2 = p.x-bw/2, by2 = p.y+r*1.15;
       ctx.fillStyle='rgba(255,255,255,0.7)'; rr(bx2,by2,bw,bh,bh/2); ctx.fill();
       ctx.fillStyle='#4ec3ff'; rr(bx2,by2,bw*clamp(p.water/STAGE_WATER,0,1),bh,bh/2); ctx.fill();
@@ -1395,7 +1544,7 @@ var Garden = (function(){
     }
 
     /* progress: how many have bloomed */
-    var bloomed = s.plots.filter(function(q){return q.stage>=3;}).length;
+    var bloomed = s.plots.filter(function(q){return q.stage>=s.target;}).length;
     ctx.save();
     ctx.fillStyle='rgba(255,255,255,0.82)';
     rr(U*4,U*5,U*26,U*11,U*4.6); ctx.fill();
@@ -1595,15 +1744,19 @@ var Letters = (function(){
 
   function spawnRow(wy){
     var want = s.word[s.at];
-    var letters = [want];
     var pool = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    while(letters.length<3){
-      var c = pool[rndi(0,25)];
-      if(letters.indexOf(c)<0) letters.push(c);
-    }
-    /* shuffle */
-    for(var i=letters.length-1;i>0;i--){ var j=rndi(0,i); var tmp=letters[i]; letters[i]=letters[j]; letters[j]=tmp; }
-    s.rows.push({ wy:wy, letters:letters, hit:[false,false,false], forIndex:s.at });
+    var lanes = [null,null,null];
+    var right = rndi(0,2);
+    lanes[right] = want;
+    /* one decoy in one of the other two lanes; the third stays empty so she can
+       always drive straight past instead of being forced into a wrong letter */
+    var others = [];
+    for(var i=0;i<3;i++) if(i!==right) others.push(i);
+    var decoy = others[rndi(0,others.length-1)];
+    var c;
+    do { c = pool[rndi(0,25)]; } while(c === want);
+    lanes[decoy] = c;
+    s.rows.push({ wy:wy, letters:lanes, hit:[false,false,false], forIndex:s.at });
   }
 
   function update(dt,t){
@@ -1641,7 +1794,7 @@ var Letters = (function(){
       var sy = H - (r.wy - s.scroll);
       if(sy > H+U*22){ s.rows.splice(i,1); continue; }
       for(var k=0;k<3;k++){
-        if(r.hit[k]) continue;
+        if(r.hit[k] || !r.letters[k]) continue;
         var lx = laneX(k);
         if(dist2(lx,sy,s.carX,s.carY) < grab*grab){
           r.hit[k]=true;
@@ -1704,7 +1857,7 @@ var Letters = (function(){
       var sy = H - (r.wy - s.scroll);
       if(sy<-U*20 || sy>H+U*20) continue;
       for(var k=0;k<3;k++){
-        if(r.hit[k]) continue;
+        if(r.hit[k] || !r.letters[k]) continue;
         var lx = laneX(k);
         var want = (r.letters[k]===s.word[s.at]);
         var sz = U*8.5;
@@ -1796,13 +1949,16 @@ var Cheer = (function(){
     deliver:  'They loved your flowers!',
     letters:  'You spelled a word!'
   };
+  var GARDEN_LINES = ['', 'Little sprouts came up!', 'Your plants got bigger!', 'The flowers bloomed!'];
   function enter(data){
     var kind = (data&&data.kind)||'drive';
     var sticker = pick(STICKERS);
     G.stickers.push(sticker);
     if(G.stickers.length>40) G.stickers = G.stickers.slice(-40);
     saveProgress();
-    s = { kind:kind, sticker:sticker, t:0, line:LINES[kind]||'Yay!', data:data||{} };
+    var line = LINES[kind] || 'Yay!';
+    if(kind==='garden' && data && data.target) line = GARDEN_LINES[data.target];
+    s = { kind:kind, sticker:sticker, t:0, line:line, data:data||{} };
     Audio2.sfx.star();
     Voice.say('yay'+rndi(0,3));
     for(var k=0;k<24;k++){
