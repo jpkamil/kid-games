@@ -4,35 +4,35 @@
 Browser speech synthesis on iOS is robotic and differs by device, so the fixed
 vocabulary is rendered once here and shipped inside the HTML.
 
-Two things fight the robot sound:
-  * engine choice.  Every English voice on a stock Mac is `compact`,
-    `super-compact` or `eloquence` (run tools/list_voices for proof).  Eloquence
-    (Flo, Sandy, Grandma, Rocko, Reed, Eddy) is the harshest of the three, so the
-    cast is built from the MacinTalk voices instead -- Samantha, Moira, Daniel,
-    Karen -- and the children are those same voices pitched up.
-  * post-processing.  A little warmth at 280 Hz, a cut in the nasal 2.9 kHz band
-    where the buzz lives, gentle de-essing and a 22 ms early reflection.
+Rendered with Piper, a small offline neural TTS.  The first version of this
+used macOS `say`, but every English voice on a stock Mac is compact,
+super-compact or eloquence -- all formant/concatenative engines that sound
+unmistakably robotic, which is exactly what Jeremy heard.  Piper is a neural
+model, runs entirely offline, and needs nothing installed system-wide.
 
-The real fix is an Enhanced or Premium voice, which is a free download in
-System Settings > Accessibility > Spoken Content > System Voice > Manage Voices.
-Install one, pass its name as argv[1], and rerun -- no code change needed.
+Setup (once):
+    ./setup_voice.sh          # venv + models under ~/.local/share/nina-tts
+
+Then:
+    python3 build_voice.py && ./build.sh
 """
-import base64, json, os, subprocess, sys, shutil
+import base64, json, os, shutil, subprocess, sys, wave
 
-NARRATOR = sys.argv[1] if len(sys.argv) > 1 else "Samantha"
-RATE     = sys.argv[2] if len(sys.argv) > 2 else "162"
+TTS   = os.path.expanduser("~/.local/share/nina-tts")
+PY_   = os.path.join(TTS, "venv/bin/python")
+MODEL = os.path.join(TTS, "models")
 OUT, TMP = "voice_clips.js", "voicebuild"
 
-# voice, pitch-baseline markup, post pitch/formant factor
-NARR  = (NARRATOR, 54, 1.00)
+# voice model, pitch/formant factor applied afterwards, phoneme length (>1 = slower)
+NARR = ('en_US-amy-medium', 1.00, 1.06)
 CAST = {
-  'mom':     (NARRATOR,   54, 1.00),
-  'grandma': ('Moira',    46, 0.97),   # warm, older; Eloquence "Grandma" is far harsher
-  'dad':     ('Daniel',   40, 0.97),
-  'teacher': ('Karen',    52, 1.00),
-  'theo':    ('Daniel',   58, 1.14),   # pitched up into a boy
-  'oliver':  ('Daniel',   66, 1.09),
-  'mia':     ('Karen',    64, 1.10),
+  'mom':     ('en_US-amy-medium',          1.00, 1.06),
+  'grandma': ('en_US-kristin-medium',      0.95, 1.16),   # slower and lower
+  'dad':     ('en_US-ryan-high',           0.99, 1.04),
+  'teacher': ('en_GB-jenny_dioco-medium',  1.00, 1.06),
+  'theo':    ('en_US-ryan-high',           1.20, 1.00),   # pitched up into a boy
+  'oliver':  ('en_US-ryan-high',           1.13, 1.02),
+  'mia':     ('en_US-hfc_female-medium',   1.08, 1.04),
 }
 FOR_LINE = {
   'mom':'Flowers for Mommy!', 'dad':'Flowers for Daddy!', 'grandma':'Flowers for Grandma!',
@@ -53,19 +53,18 @@ COLORS = ['pink','yellow','purple','red','blue','orange','white']
 NUMS   = ['One!','Two!','Three!','Four!','Five!','Six!']
 
 clips = {}
-def add(cid, text, who=None, rate=None, pitch=None):
-    v, pbas, p = CAST[who] if who else NARR
-    clips[cid] = (text, v, rate or RATE, pbas if pitch is None else pitch, p)
+def add(cid, text, who=None, slow=None):
+    model, pitch, length = CAST[who] if who else NARR
+    clips[cid] = (text, model, pitch, length if slow is None else slow)
 
 add('hi',     "Hi Nina! Let's go pick flowers!")
-add('basket', "Your basket is full! Great job Nina!")
+add('basket', "Your basket is full! Great job, Nina!")
 add('water',  "Let's water the garden!")
 add('find',   "Now find the letter")
-# the garden is revisited, so it needs lines for each stage of growth
 add('g_again',  "Your garden is growing! Let's water it again.")
 add('g_sprout', "Look! Little green sprouts came up!")
 add('g_bud',    "Look, they got bigger! The buds are almost ready.")
-for i,n in enumerate(NUMS): add('n%d'%(i+1), n, rate='150')
+for i,n in enumerate(NUMS): add('n%d'%(i+1), n, slow=1.22)
 for c in COLORS:            add('c_'+c, "A %s flower!"%c)
 for k,v in FOR_LINE.items(): add('for_'+k, v)
 for k,v in THANKS.items():   add('thx_'+k, v, who=k)
@@ -73,39 +72,57 @@ for w in WORDS:
     add('sp_'+w, "Let's spell %s!"%w.lower())
     add('dn_'+w, "%s! You spelled %s!"%(w.lower(), w.lower()))
 for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-    add('L_'+ch, ch+"!", rate='140')
+    add('L_'+ch, ch+".", slow=1.30)
 for i,l in enumerate(["Great job!","Wonderful!","You did it!","Yay Nina!"]):
     add('yay%d'%i, l)
 
-TRIM  = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,"
-         "areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,areverse")
-WARM  = ("highpass=f=90,"
-         "equalizer=f=280:t=q:w=1.0:g=2.5,"     # body
-         "equalizer=f=2900:t=q:w=1.4:g=-3.5,"   # the nasal buzz that reads as "robot"
-         "equalizer=f=5400:t=q:w=1.6:g=-2.0,"
-         "lowpass=f=9000,deesser,"
-         "aecho=0.9:0.25:22:0.08,"              # one early reflection: a room, not a reverb
-         "loudnorm=I=-16:TP=-1.5:LRA=11")
+# ---- synthesise, grouped by model so each one loads exactly once ----
+shutil.rmtree(TMP, ignore_errors=True); os.makedirs(TMP)
+jobs = {}
+for cid,(text,model,pitch,length) in clips.items():
+    jobs.setdefault(model, []).append({'id':cid, 'text':text, 'length':length})
+
+worker = os.path.join(TMP, "_synth.py")
+open(worker,"w").write('''
+import json, sys, wave
+from piper import PiperVoice, SynthesisConfig
+spec = json.load(open(sys.argv[1]))
+voice = PiperVoice.load(spec["model"])
+for j in spec["jobs"]:
+    with wave.open(j["out"], "wb") as w:
+        voice.synthesize_wav(j["text"], w, SynthesisConfig(length_scale=j["length"]))
+print("ok", len(spec["jobs"]))
+''')
+for model, js in jobs.items():
+    for j in js: j['out'] = os.path.join(TMP, j['id']+'.wav')
+    spec = os.path.join(TMP, 'spec_%s.json'%model)
+    json.dump({'model': os.path.join(MODEL, model+'.onnx'), 'jobs': js}, open(spec,'w'))
+    subprocess.run([PY_, worker, spec], check=True, stdout=subprocess.DEVNULL)
+    print("  %-30s %d clips" % (model, len(js)))
+
+# ---- trim, pitch, level, encode ----
+TRIM = ("silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.02,"
+        "areverse,silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.02,areverse")
+# neural output needs almost nothing: a high-pass and a level match.  The heavy
+# de-buzz EQ the `say` version used would only muddy it.
+POST = "highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11"
 
 def chain(p):
     pitch = "" if abs(p-1.0) < 0.005 else \
         "aresample=22050,asetrate=%d,aresample=22050,atempo=%.4f," % (int(22050*p), 1.0/p)
-    return pitch + TRIM + "," + WARM
+    return pitch + TRIM + "," + POST
 
-shutil.rmtree(TMP, ignore_errors=True); os.makedirs(TMP)
 out, total = {}, 0
-for cid,(text,voice,rate,pbas,pitch) in clips.items():
-    aiff = os.path.join(TMP, cid+'.aiff'); m4a = os.path.join(TMP, cid+'.m4a')
-    subprocess.run(['say','-v',voice,'-r',rate,'-o',aiff,'[[pbas %d]] %s'%(pbas,text)], check=True)
-    subprocess.run(['ffmpeg','-y','-loglevel','error','-i',aiff,'-af',chain(pitch),
+for cid,(text,model,pitch,length) in clips.items():
+    wav = os.path.join(TMP, cid+'.wav'); m4a = os.path.join(TMP, cid+'.m4a')
+    subprocess.run(['ffmpeg','-y','-loglevel','error','-i',wav,'-af',chain(pitch),
                     '-ar','22050','-ac','1','-c:a','aac','-b:a','32k', m4a], check=True)
     raw = open(m4a,'rb').read(); total += len(raw)
     out[cid] = base64.b64encode(raw).decode('ascii')
 
 with open(OUT,'w') as f:
-    f.write("/* Spoken lines rendered offline with macOS `say` (narrator: %s),\n"
-            "   warmed and pitched by build_voice.py.  Baked in so every device\n"
-            "   says it the same way, with no network. */\n" % NARRATOR)
+    f.write("/* Spoken lines rendered offline with Piper neural TTS (see build_voice.py).\n"
+            "   Baked in so every device says it the same way, with no network. */\n")
     f.write("var VOICE_CLIPS = " + json.dumps(out, separators=(',',':')) + ";\n")
 print("clips: %d   audio: %.0f KB   base64: %.0f KB"
       % (len(out), total/1024, os.path.getsize(OUT)/1024))
