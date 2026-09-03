@@ -673,7 +673,7 @@ var LEVELS=[
 var DIFF=LEVELS[clamp(parseInt(LS.get('cm_diff'),10)||0,0,LEVELS.length-1)];
 /* how hot is it. One chilli per notch. */
 function peppers(L){ var c=''; for(var i=0;i<L.p;i++) c+='\ud83c\udf36'; return c+'  '+L.n; }
-function setDiff(i){ i=clamp(i|0,0,LEVELS.length-1); DIFF=LEVELS[i]; LS.set('cm_diff',String(i)); }
+function setDiff(i){ i=clamp(i|0,0,LEVELS.length-1); DIFF=LEVELS[i]; LS.set('cm_diff',String(i)); BEST=loadBest(); }
 
 /* The Pac-Man pellet. Three flavours, same result: the guards start running. */
 var TREATS=[
@@ -699,7 +699,12 @@ var BOXES=[
 var GEN=0;                /* bumped on every run/phase change; stale timers check it */
 var SCENE='menu';         /* menu | brief | play | shop | over | pause */
 var PHASE='store';        /* store | home | escape */
-var ROUND=1, COINS=0, BEST=parseInt(LS.get('cm_best')||'0',10)||0;
+var ROUND=1, COINS=0;
+/* One best per heat level, so a MILD run can't sit on top of the HOT board.
+   The old single key is the fallback so nobody's record disappears. */
+function bestKey(){ return 'cm_best_'+LEVELS.indexOf(DIFF); }
+function loadBest(){ return parseInt(LS.get(bestKey())||LS.get('cm_best')||'0',10)||0; }
+var BEST=loadBest();
 
 var P=null;               /* player */
 var W=null;               /* world */
@@ -1129,6 +1134,7 @@ function startPhase(ph){
   }
   if(ph==='escape'){ W=buildEscape(); P.x=90; P.y=W.h/2; W.left=1; }
   P.vx=P.vy=0; P.followers=[]; P.trail=[]; P.iframe=1.2;
+  for(var bk in P.buff) P.buff[bk]=0; P.dashing=0; P.rampChain=0;   /* a pellet grabbed at the door stays in that building */
   CAM.sc=viewScale();
   CAM.x=clamp(P.x-CW/CAM.sc/2,0,Math.max(0,W.w-CW/CAM.sc));
   CAM.y=clamp(P.y-CH/CAM.sc/2,0,Math.max(0,W.h-CH/CAM.sc));
@@ -1204,7 +1210,7 @@ function hurtPlayer(n,why){
   if(P.iframe>0) return false;
   if(P.shield>0){ P.shield--; P.iframe=1.0; toast('SHIELD HELD!','good'); SFX.hurt();
     shake(6); syncHud(); return false; }
-  P.hp-=n; P.iframe=1.15; shake(11); SFX.hurt(); flash(.5);
+  P.hp-=n; P.iframe=1.15; shake(11); SFX.hurt(); flash(.5); FREEZE=.10;
   STATS.hits++;
   /* Panic: half the conga line wanders off. */
   if(P.followers.length){
@@ -1312,8 +1318,8 @@ function ejectFoe(f){
   addCoins(val); STATS.ejected++;
   pop(f.x,f.y,'+'+val,'#8ce34f');
   burst(f.x,f.y,'#4bc8ff',18);
-  SFX.free();
-  if(P.rampChain>=4) toast('EJECTED x'+P.rampChain+'!','good');
+  SFX.free(); FREEZE=.08;
+  if(P.rampChain>=2) toast('EJECTED x'+P.rampChain+'!  +'+val,'good');   /* show the chain doubling as it happens */
   /* he comes back, eventually, from the far side, and he is upset */
   f.respawn=9;
 }
@@ -1520,9 +1526,17 @@ function updateSeniors(dt){
       }
     }
     /* nobody in the building is reachable: that is a dead phase, so restock */
-    if(!canLure&&W.seniors.some(function(z){return !z.freed&&z.st!=='follow';})){
-      P.ammo.candy+=3;
-      toast('GERALD SLIPS YOU MORE CANDY','gold'); SFX.grab(); syncHud();
+    if(W.restockCd>0) W.restockCd-=dt;
+    if(!canLure&&!(W.restockCd>0)&&
+       W.seniors.some(function(z){return !z.freed&&z.st!=='follow'&&z.st!=='taken';})){
+      /* Hand over what the waiting resident actually wants. The old version gave
+         candy to a cat-food holdout, and while an orderly was hauling the last
+         resident away it fired every frame: +180 candy a second and a toast per tick. */
+      var wantK='candy';
+      for(var wi=0;wi<W.seniors.length;wi++){ var ws=W.seniors[wi];
+        if(!ws.freed&&ws.st!=='follow'&&ws.st!=='taken'&&P.wep[ws.want]){ wantK=ws.want; break; } }
+      P.ammo[wantK]=(P.ammo[wantK]||0)+3; W.restockCd=5;
+      toast('GERALD SLIPS YOU MORE '+wantK.toUpperCase(),'gold'); SFX.grab(); syncHud();
     }
   }
   /* How close a dropped snack has to land before he notices it. 95 was about a
@@ -1700,6 +1714,7 @@ function updateShots(dt){
       /* drag: candy and cat food come to rest and become bait */
       if(s.t==='lure'){ s.vx*=Math.pow(.06,dt); s.vy*=Math.pow(.06,dt);
         if(Math.hypot(s.vx,s.vy)<28){ s.landed=true; s.vx=s.vy=0; s.life=Math.max(s.life,7); } }
+      if(s.t==='juice'){ s.vx*=Math.pow(.10,dt); s.vy*=Math.pow(.10,dt); }   /* no drag = never puddled except on a wall */
       if(s.t==='juice'&&Math.hypot(s.vx,s.vy)<40){
         W.puddles.push({x:s.x,y:s.y,r:52,t:9,slip:true}); s.dead=true; beep(300,.2,'sine',.1,120); continue;
       }
@@ -1793,7 +1808,7 @@ function dropSmart(){
 }
 
 function deliver(){
-  if(!ORDER) return;
+  if(!ORDER||ORDER.done) return;
   if(!P.cart.length){ geraldSays(pick(HURRY_LINES)); beep(200,.08,'sine',.07); return; }
   var right=0, wrong=0;
   for(var i=P.cart.length-1;i>=0;i--){
@@ -1809,7 +1824,7 @@ function deliver(){
     pop(W.gerald.x,W.gerald.y-46,'+'+(9*right),'#ffcf3d');
   }
   if(wrong){
-    STATS.wrong+=wrong;
+    STATS.wrong+=wrong; ORDER.wrongs=(ORDER.wrongs||0)+wrong;
     W.gerald.mad=.9; W.gerald.swing=SWING_T; SFX.cane(); shake(14); flash(.45,'#ff4d5e');
     pop(P.x,P.y-24,'WHACK!','#ff4d5e');
     geraldSays(pick(CANE_LINES));
@@ -1825,7 +1840,14 @@ function deliver(){
   }
   var done=ORDER.got.every(function(g){return g;});
   if(done){
+    ORDER.done=true;   /* a second delivery inside the 900ms hand-off used to pay the bonus twice */
     var bonus=Math.round(18+ROUND*4+PATIENCE/PATMAX*26);
+    /* a clean order -- nothing wrong, ever -- builds a streak that multiplies the bonus */
+    if(!ORDER.wrongs){ STATS.streak=(STATS.streak||0)+1; } else { STATS.streak=0; }
+    if(STATS.streak>=2){
+      bonus=Math.round(bonus*(1+0.5*Math.min(4,STATS.streak-1)));
+      toast('PERFECT x'+STATS.streak+'!','good');
+    }
     addCoins(bonus); STATS.orders++;
     geraldDance();
     geraldSays(pick(PRAISE_LINES));
@@ -1895,7 +1917,7 @@ function finishPhase(){
   else if(PHASE==='home'){ brief('escape'); }
   else { ROUND++; STATS.rounds=Math.max(STATS.rounds,ROUND-1);
          /* lifetime earned, not what is left in her pocket -- see addCoins */
-         if(STATS.coins>BEST){BEST=STATS.coins;LS.set('cm_best',String(BEST));}
+         if(STATS.coins>BEST){BEST=STATS.coins;LS.set(bestKey(),String(BEST));}
          openShop(); }
 }
 
@@ -1903,6 +1925,7 @@ function finishPhase(){
    FX
    ==========================================================================*/
 var CAM={x:0,y:0,sc:1,shake:0,flash:0,flashCol:'#fff'};
+var FREEZE=0;   /* seconds of hit-stop: the world crawls for a beat on a big hit */
 function shake(n){ CAM.shake=Math.min(26,CAM.shake+n); }
 function flash(a,c){ CAM.flash=Math.max(CAM.flash,a); CAM.flashCol=c||'#ffffff'; }
 function burst(x,y,col,n){
@@ -2884,7 +2907,7 @@ function menu(){
       '<div class="difflbl" id="mDiffN">'+peppers(DIFF)+'</div>'+
       '<div class="diffdesc" id="mDiffD">'+DIFF.d+'</div>'+
     '</div>'+
-    '<div class="tag" style="margin-top:12px">Best total take: <b style="color:var(--sun)">'+BEST+'</b> coins</div>'
+    '<div class="tag" style="margin-top:12px">Best total take: <b id="mBest" style="color:var(--sun)">'+BEST+'</b> coins</div>'
   );
   on('mPlay',function(){ startGame(); });
   /* live-updated in place rather than rebuilding the menu, so the thumb stays
@@ -2892,7 +2915,7 @@ function menu(){
   (function(){
     var r=$('mDiffR'); if(!r) return;
     r.addEventListener('input',function(){
-      setDiff(parseInt(r.value,10));
+      setDiff(parseInt(r.value,10)); var mb=$('mBest'); if(mb) mb.textContent=BEST;
       $('mDiffN').textContent=peppers(DIFF);
       $('mDiffD').textContent=DIFF.d;
     });
@@ -3010,7 +3033,7 @@ function togglePause(){
 
 function gameOver(){
   GEN++; SCENE='over'; paused=false; elHud.hidden=true; SFX.jail(); musForScene();
-  if(STATS.coins>BEST){ BEST=STATS.coins; LS.set('cm_best',String(BEST)); }
+  if(STATS.coins>BEST){ BEST=STATS.coins; LS.set(bestKey(),String(BEST)); }
   var lines=[
     '“He was carrying a watermelon and eleven pounds of gummy bears.”',
     '“He had a golf cart conga line. Nine residents. Nine.”',
@@ -3043,8 +3066,8 @@ function gameOver(){
 
 function startGame(){
   GEN++;
-  P=newPlayer(); COINS=0; ROUND=1; paused=false;
-  STATS={orders:0,right:0,wrong:0,freed:0,ejected:0,thrown:0,boxes:0,bonks:0,coins:0,hits:0,grabbed:0,rounds:0};
+  P=newPlayer(); COINS=0; ROUND=1; paused=false; syncHud._sig='';
+  STATS={orders:0,right:0,wrong:0,freed:0,ejected:0,thrown:0,boxes:0,bonks:0,coins:0,hits:0,grabbed:0,rounds:0,streak:0};
   hideVeil(); SCENE='play'; elHud.hidden=false;
   CAM.x=CAM.y=0;
   startPhase('store');
@@ -3060,6 +3083,7 @@ function step(ts){
   framesDrawn++;
   var dt=(ts-last)/1000; last=ts;
   if(!(dt>0)||dt>.25) dt=1/60;
+  if(FREEZE>0){ FREEZE-=dt; dt*=0.15; }
   try{
     musTick();
     if(SCENE==='play'&&!paused&&W) simulate(dt);
@@ -3085,7 +3109,7 @@ function simulate(dt){
     if(PHASE==='home') updateSeniors(dt);
     for(var s=0;s<W.spots.length;s++) if(W.spots[s].cool>0) W.spots[s].cool-=dt;
     /* Gerald's patience */
-    if(PHASE==='store'&&ORDER){
+    if(PHASE==='store'&&ORDER&&!ORDER.done){
       PATIENCE-=dt*(atGerald()?.35:1);
       if(PATIENCE<=0){
         PATIENCE=PATMAX*.8; W.gerald.mad=1; W.gerald.swing=SWING_T; SFX.cane(); shake(10);
