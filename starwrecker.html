@@ -730,7 +730,8 @@ function startMusic(){
   tick(); muTimer=setInterval(tick,110);
 }
 function stopMusic(keep){ if(muTimer){ clearInterval(muTimer); muTimer=null; } if(!keep){ muStep=0; } }
-function setMusic(cfg){ MU=cfg; if(audioMode>=2) startMusic(); }
+let booting=true;   /* notes scheduled into a suspended context at boot all dump out on the first tap */
+function setMusic(cfg){ MU=cfg; if(audioMode>=2 && !booting) startMusic(); }
 
 
 </script>
@@ -762,17 +763,22 @@ try{
     };
   }
 }catch(_){}
-let W=0,H=0,DPR=1;
+let W=0,H=0,DPR=1,BG=null,lastBossFill=-1;
 function resize(){
-  DPR=Math.min(devicePixelRatio||1,2.5);
+  const ndpr=Math.min(devicePixelRatio||1,2.5);
   /* Measure the viewport itself. If the host wraps us in a transformed or scrolled
      container, position:fixed stops meaning "the screen" and clientWidth goes wrong. */
-  W=Math.round(window.innerWidth||document.documentElement.clientWidth||cv.clientWidth||360);
-  H=Math.round(window.innerHeight||document.documentElement.clientHeight||cv.clientHeight||640);
+  const nw=Math.round(window.innerWidth||document.documentElement.clientWidth||cv.clientWidth||360);
+  const nh=Math.round(window.innerHeight||document.documentElement.clientHeight||cv.clientHeight||640);
+  /* iOS fires resize on every toolbar nudge; don't throw away the canvas for nothing */
+  if(nw===W && nh===H && ndpr===DPR && cv.width===Math.round(nw*ndpr)) return;
+  W=nw; H=nh; DPR=ndpr;
   cv.style.width=W+'px'; cv.style.height=H+'px';
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
   g.setTransform(DPR,0,0,DPR,0,0);
-  if(P) P.y=clamp(P.y,60,H-40);
+  BG=g.createLinearGradient(0,0,0,H);
+  BG.addColorStop(0,'#080b1c'); BG.addColorStop(0.55,'#05060f'); BG.addColorStop(1,'#0a0716');
+  if(P){ P.y=clamp(P.y,60,H-40); P.x=clamp(P.x,20,W-20); }
 }
 addEventListener('resize',()=>setTimeout(resize,60));
 addEventListener('orientationchange',()=>setTimeout(resize,220));
@@ -954,8 +960,16 @@ function burst(x,y,n,col,spd,life){
       life:rnd(life*0.55,life),max:life,col,r:rnd(1.6,3.6)});
   }
 }
+let floats=[], rings=[], hitstop=0;
+function floatText(x,y,txt,col){
+  if(reduced) return;
+  if(floats.length>24) floats.shift();
+  floats.push({x,y,txt,col,t:0});
+}
 /* physics lives in update() so particles can never pile up when drawing is skipped */
 function updateParts(dt){
+  for(let i=floats.length-1;i>=0;i--){ const f=floats[i]; f.t+=dt; f.y-=42*dt; if(f.t>0.9) floats.splice(i,1); }
+  for(let i=rings.length-1;i>=0;i--){ const r=rings[i]; r.t+=dt; r.r+=980*dt; if(r.t>0.55) rings.splice(i,1); }
   for(let i=parts.length-1;i>=0;i--){
     const p=parts[i];
     p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.965; p.vy*=0.965; p.vy+=40*dt;
@@ -969,6 +983,22 @@ function drawParts(){
     g.globalAlpha=clamp(p.life/p.max,0,1);
     g.fillStyle=p.col;
     g.beginPath(); g.arc(p.x,p.y,p.r,0,6.283); g.fill();
+  }
+  for(const r of rings){
+    const k=1-r.t/0.55;
+    g.globalAlpha=k; g.strokeStyle=T.glow; g.lineWidth=2+9*k;
+    g.beginPath(); g.arc(r.x,r.y,r.r,0,6.283); g.stroke();
+    g.globalAlpha=k*0.5; g.strokeStyle='#fff'; g.lineWidth=1.5+3*k;
+    g.beginPath(); g.arc(r.x,r.y,r.r*0.82,0,6.283); g.stroke();
+  }
+  if(floats.length){
+    g.font='800 15px "Fredoka",system-ui,sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+    g.lineJoin='round'; g.lineWidth=3.5; g.strokeStyle='rgba(0,0,0,.75)';
+    for(const f of floats){
+      g.globalAlpha=f.t<0.6?1:clamp((0.9-f.t)/0.3,0,1);
+      g.strokeText(f.txt,f.x,f.y); g.fillStyle=f.col; g.fillText(f.txt,f.x,f.y);
+    }
+    g.textAlign='left'; g.textBaseline='alphabetic';
   }
   g.globalAlpha=1;
 }
@@ -1060,7 +1090,8 @@ function updateFoes(dt){
   for(let i=foes.length-1;i>=0;i--){
     const f=foes[i], d=FOE[f.type];
     f.t+=dt; if(f.hit>0) f.hit-=dt;
-    switch(f.type){
+    if(f.leaving){ f.held=false; f.y+=170*dt; }   /* retreating: drift off the bottom, no more parking */
+    else switch(f.type){
       case 'drifter': f.y+=(d.spd*(f.spdMul||1))*dt; f.x=f.bx+Math.sin(f.t*1.9+f.ph)*48; break;
       case 'rusher':  f.y+=(d.spd*(f.spdMul||1))*dt; f.x+=Math.sin(f.t*4+f.ph)*22*dt;    break;
       case 'weaver':  f.y+=(d.spd*(f.spdMul||1))*dt; f.x=f.bx+Math.sin(f.t*2.4+f.ph)*72;
@@ -1133,7 +1164,8 @@ function killFoe(f,i){
   burst(f.x,f.y,6,'#fff',150,0.3);
   sfx.boom(); shake=Math.min(shake+3.5,11);
   if(f.mini){ banner(pick(SMALLBOOMS)); sfx.bonk(); }
-  addScore(f.sc); combo++; runKills++; bumpCombo();
+  combo++; runKills++; bumpCombo(); addScore(f.sc);   /* multiplier first, so the kill that earns x5 gets x5 */
+  floatText(f.x,f.y-14,'+'+Math.round(f.sc*mult),f.mini?'#ffd07a':T.glow);
   od=Math.min(100,od+(f.max>2?7:3.2));
   rollDrop(f.x,f.y,f.max);
 }
@@ -1160,7 +1192,7 @@ function updateDrops(dt){
     const d=drops[i]; d.t+=dt; d.y+=d.vy*dt; d.x+=Math.sin(d.t*2.6)*26*dt;
     /* ---- THE MAGNET ----  (Tinker Deck explainer #1 quotes these five lines) */
     const dx=P.x-d.x, dy=P.y-d.y, dist=Math.hypot(dx,dy);
-    if(dist<MAGNET_RADIUS){
+    if(dist>0.5 && dist<MAGNET_RADIUS){                  /* dist 0 made NaN, and a NaN drop never got collected */
       d.x += dx/dist * MAGNET_PULL * dt;
       d.y += dy/dist * MAGNET_PULL * dt;
     }
@@ -1184,7 +1216,8 @@ function drawDrops(){
 }
 function takeDrop(d){
   if(d.k==='w'){
-    if(tier<4){ tier++; sfx.power(); banner('WEAPON UP'); } else { addScore(250); sfx.pick(); }
+    if(tier<4){ tier++; sfx.power(); banner('WEAPON UP'); }
+    else if(!gunUnlockNext()){ addScore(250); sfx.pick(); }   /* past tier IV a W unlocks the next gun */
     updHUD();
   } else if(d.k==='s'){ shield=shieldMax+SHIELD_BONUS; sfx.power();
     banner(shield>1?('SHIELD x'+shield):'SHIELD UP'); }
@@ -1224,9 +1257,11 @@ function shoot(){
     for(let i=0;i<n;i++) mk(P.x+(i?12:-12)*(n-1),rnd(-70,70),-380,{home:1,r:5});
     sfx.pop();
   } else {                                             // ricochet
-    mk(P.x,0,-620,{bounce:3,r:5});                    // centre shot at EVERY tier
-    mk(P.x-6,-90,-560,{bounce:3,r:5});
-    mk(P.x+6, 90,-560,{bounce:3,r:5});
+    const nb=2+tier;                                  // more bounces per tier; extra wide shots at III+
+    mk(P.x,0,-620,{bounce:nb,r:5});                   // centre shot at EVERY tier
+    mk(P.x-6,-90,-560,{bounce:nb,r:5});
+    mk(P.x+6, 90,-560,{bounce:nb,r:5});
+    if(tier>=3){ mk(P.x-14,-210,-500,{bounce:nb,r:5}); mk(P.x+14,210,-500,{bounce:nb,r:5}); }
     sfx.shot();
   }
 }
@@ -1546,7 +1581,7 @@ const PROF={
       calcShot(b.x,b.y+10,Math.cos(aim)*150,Math.sin(aim)*150);
       sfx.buzz(); return;
     }
-    if(Math.random()<0.40){ popQuiz(); return; }    // v0.3: POP QUIZ is a real quiz now
+    if(Math.random()<0.50){ popQuiz(); return; }    // v0.3: POP QUIZ is a real quiz now
     if(b.phase>=2 && Math.random()<0.38){           // CALCULATOR STAMPEDE
       const n=b.phase===3?7:5;
       for(let i=0;i<n;i++)
@@ -1818,7 +1853,7 @@ function drawDebris(){
   }
 }
 
-const ROSTER=[OCTO,COP,LUNCH,THEMEBOSS,PROF];
+const ROSTER=[OCTO,PROF,COP,LUNCH,THEMEBOSS];   /* the Professor's POP QUIZ is the best bit; wave 10, not 25 */
 
 /* ---- lightning columns: warn where, then strike. Always dodgeable. ---- */
 /* ============================================================================
@@ -1949,9 +1984,9 @@ function drawBoss(){
   g.textAlign='left';
 }
 function killBoss(){
-  const b=boss;
+  const b=boss, gen=runGen;
   for(let i=0;i<7;i++) setTimeout(()=>{
-    if(state!=='playing'&&state!=='over') return;
+    if((state!=='playing'&&state!=='over')||gen!==runGen) return;
     burst(b.x+rnd(-60,60),b.y+rnd(-50,50),16,pick([T.glow,T.accent,'#fff']),300,0.85);
   },i*95);
   sfx.bigboom(); shake=26; flashT=0.3;
@@ -1960,7 +1995,7 @@ function killBoss(){
   $('bossbar').classList.remove('on');
   banner(pick(BOOMS));
   if(shieldMax<3){ shieldMax++; shield=shieldMax+SHIELD_BONUS;
-    setTimeout(()=>banner('SHIELD UPGRADE x'+shield),900); }
+    setTimeout(()=>{ if(gen===runGen) banner('SHIELD UPGRADE x'+shield); },900); }
   if(!gunUnlockNext()) addScore(400);
   od=Math.min(100,od+30);
 }
@@ -2003,7 +2038,7 @@ function pumpWave(dt){
   if(!spawnQ.length && foes.length && !boss){
     waveAge+=dt;
     if(waveAge>45){                        // nothing but parked foes for 45s: let them leave
-      for(const f of foes) if(f.held){ f.held=false; f.y+=170*dt; }
+      for(const f of foes) f.leaving=true;
       if(waveAge>60){ foes.length=0; banner('THEY RETREATED'); waveAge=0; }
     }
   } else waveAge=0;
@@ -2015,13 +2050,17 @@ function pumpWave(dt){
 
 /* ================= scoring ================= */
 function addScore(v){ score+=Math.round(v*mult); updHUD(); }
+let runGen=0, comboFlash=0, comboFlashTxt='';
 function bumpCombo(){
   const before=mult;
   mult = combo>=70?5 : combo>=40?4 : combo>=20?3 : combo>=8?2 : 1;
   const el=$('combo');
   el.textContent='x'+mult+(mult>1?'  '+combo+' chain':'');
   el.classList.toggle('on',mult>1);
-  if(mult>before){ el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+  if(mult>before){
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    comboFlash=1.1; comboFlashTxt='x'+mult+' COMBO!';   /* on the canvas, where he is looking */
+  }
 }
 
 /* ================= damage ================= */
@@ -2049,6 +2088,7 @@ function hurt(dmg,word){
 function nova(){
   if(od<100||state!=='playing') return;
   od=0; updOD(); sfx.nova(); shake=24; flashT=0.34;
+  hitstop=0.12; rings.push({x:P.x,y:P.y,r:14,t:0});   /* a beat of freeze, then a shockwave */
   P.inv=Math.max(P.inv,1.25); ebul.length=0;
   for(const f of foes){ f.hp-=6; f.hit=0.22; }
   if(boss){ boss.hp-=60; boss.hit=0.3; if(boss.hp<=0) killBoss(); }
@@ -2158,11 +2198,16 @@ function updHUD(){
   $('score').textContent=money(score);
   $('wave').textContent=wave;
   const w=TIERS[tier-1], G=GUNS[gun], many=unlocked.filter(Boolean).length>1;
-  $('wep').innerHTML=G.n+' <b>'+w.r+'</b>'+(many?' <span style="opacity:.55">\u21bb</span>':'');
-  $('wep').style.color=G.c;
-  let h='';
-  for(let i=0;i<clamp(lives+1,0,6);i++) h+='<div class="pip"></div>';
-  $('lives').innerHTML=h;
+  /* updHUD runs on every point scored; rebuild the weapon chip and the life pips only when they change */
+  const sig=tier+'/'+gun+'/'+lives+'/'+(many?1:0);
+  if(sig!==updHUD._sig){
+    updHUD._sig=sig;
+    $('wep').innerHTML=G.n+' <b>'+w.r+'</b>'+(many?' <span style="opacity:.55">\u21bb</span>':'');
+    $('wep').style.color=G.c;
+    let h='';
+    for(let i=0;i<clamp(lives+1,0,6);i++) h+='<div class="pip"></div>';
+    $('lives').innerHTML=h;
+  }
   const frac=clamp(hull/HULL_MAX,0,1), hb=$('hull');
   $('hullFill').style.width=(frac*100)+'%';
   hb.classList.toggle('low', frac<=0.55 && frac>0.28);
@@ -2173,9 +2218,13 @@ function bumpHull(){
   hb.classList.remove('bump'); void hb.offsetWidth; hb.classList.add('bump');
 }
 function updOD(){
-  $('odFill').style.height=od+'%';
-  $('od').classList.toggle('ready',od>=100);
-  $('odTxt').innerHTML = od>=100 ? 'FIRE!' : 'OVER<br>DRIVE';
+  /* called every frame; touching the DOM only when the number moves */
+  const v=Math.round(od), ready=od>=100;
+  if(updOD._v===v && updOD._r===ready) return;
+  updOD._v=v; updOD._r=ready;
+  $('odFill').style.height=v+'%';
+  $('od').classList.toggle('ready',ready);
+  $('odTxt').innerHTML = ready ? 'FIRE!' : 'OVER<br>DRIVE';
 }
 function banner(t){
   const el=$('banner'); el.textContent=t;
@@ -2439,6 +2488,7 @@ addEventListener('keydown',e=>{
   if(e.key==='p'||e.key==='Escape'){ state==='playing'?pause():(state==='paused'&&resume()); }
 });
 addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
 $('od').addEventListener('click',nova);
 $('wep').addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); cycleGun(); });
 $('wep').addEventListener('touchstart',function(e){ e.preventDefault(); e.stopPropagation(); cycleGun(); },{passive:false});
@@ -2468,7 +2518,8 @@ function update(dt){
   if(boss){
     updateBoss(dt);
     updBolts(dt);
-    $('bossFill').style.width=clamp(boss.hp/boss.max*100,0,100)+'%';
+    const bf=Math.round(clamp(boss.hp/boss.max*100,0,100)*2)/2;
+    if(bf!==lastBossFill){ lastBossFill=bf; $('bossFill').style.width=bf+'%'; }
   }
   updateDrops(dt);
   updDebris(dt);
@@ -2482,9 +2533,7 @@ function update(dt){
 }
 function draw(dt){
   g.clearRect(0,0,W,H);
-  const grd=g.createLinearGradient(0,0,0,H);
-  grd.addColorStop(0,'#080b1c'); grd.addColorStop(0.55,'#05060f'); grd.addColorStop(1,'#0a0716');
-  g.fillStyle=grd; g.fillRect(0,0,W,H);
+  g.fillStyle=BG||'#05060f'; g.fillRect(0,0,W,H);
 
   g.save();
   if(shake>0.2) g.translate(rnd(-shake,shake)*0.5,rnd(-shake,shake)*0.5);
@@ -2500,6 +2549,16 @@ function draw(dt){
   drawParts();
   g.restore();
 
+  if(comboFlash>0){
+    comboFlash-=dt;
+    const k=clamp(comboFlash/1.1,0,1), sc=1+Math.max(0,k-0.82)*7;
+    g.save(); g.globalAlpha=Math.min(1,k*2.5); g.translate(W/2,H*0.30); g.scale(sc,sc);
+    g.font='900 '+Math.round(Math.min(46,W/8))+'px "Fredoka",system-ui,sans-serif';
+    g.textAlign='center'; g.textBaseline='middle'; g.lineJoin='round';
+    g.lineWidth=7; g.strokeStyle='rgba(0,0,0,.8)'; g.strokeText(comboFlashTxt,0,0);
+    g.fillStyle=T.glow; g.fillText(comboFlashTxt,0,0);
+    g.restore();
+  }
   if(flashT>0){ g.fillStyle='rgba(255,255,255,'+clamp(flashT*1.5,0,0.5)+')'; g.fillRect(0,0,W,H); }
   /* v0.3: a red rim on every hit, so a hit always LOOKS like a hit */
   if(hitFlash>0){
@@ -2513,15 +2572,16 @@ let framesDrawn=0;
 function frame(ts){
   if(!window.__fbDrive) requestAnimationFrame(frame);
   framesDrawn++;
-  const dt=Math.min(0.042,(ts-last)/1000)||0.016; last=ts;
+  let dt=clamp((ts-last)/1000,0,0.042)||0.016; last=ts;
+  if(hitstop>0){ hitstop-=dt; dt*=0.15; }            /* overdrive hit-stop */
   if(state==='playing') update(dt);
   draw(dt);
 }
 
 /* ================= flow ================= */
 function newRun(){
-  hideCard();
-  bullets=[];foes=[];ebul=[];drops=[];parts=[];debris=[];
+  hideCard(); runGen++;
+  bullets=[];foes=[];ebul=[];drops=[];parts=[];debris=[]; floats=[]; rings=[]; hitstop=0; comboFlash=0; lastBossFill=-1;
   boss=null; $('bossbar').classList.remove('on');
   score=0; combo=0; mult=1; od=0; lives=3; tier=1; shield=0; runKills=0;
   gun=0; unlocked=[true,false,false,false,false]; bolts=[]; shieldMax=1;
@@ -2639,7 +2699,7 @@ function how(){
       <li>Kills without getting hit build a <b>combo</b> &mdash; up to <b>x5 score</b>. Getting hit resets it.</li>
       <li>When <b>OVERDRIVE</b> lights up, tap it: everything on screen takes a hit and all enemy
         fire is wiped. Save it for the boss.</li>
-      <li>Every <b>5th wave</b> is a boss, and they take turns: the <b>Electric Space Octopus</b>, <b>Officer Grumbles</b> the zombie school cop, <b>Lunchlady Gorgonzola</b>, the seasonal monster, then <b>Professor Von Homework</b>. Each changes its attack as its health drops.</li>
+      <li>Every <b>5th wave</b> is a boss, and they take turns: the <b>Electric Space Octopus</b>, <b>Professor Von Homework</b>, <b>Officer Grumbles</b> the zombie school cop, <b>Lunchlady Gorgonzola</b>, then the seasonal monster. Each changes its attack as its health drops.</li>
       <li>The Professor throws <b>calculators</b> at you and yells <b>POP QUIZ!!</b> Three answers float
         past. Shoot the <b>silliest</b> one &mdash; a right answer only makes him happier, but an answer
         like <b>A BURRITO</b> overloads his brain and he spins in circles going
@@ -2676,7 +2736,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden && state==
 resize(); 
 loadTune();
 applyTheme(SV.over||seasonFor(new Date()));
-stopMusic();
+booting=false;
 P=newShip(); seedStars(); updHUD(); updOD(); bumpCombo(); paintSound();
 menu();
 requestAnimationFrame(frame);
