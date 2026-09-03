@@ -224,6 +224,10 @@ var Audio2 = (function(){
   function stopAll(){
     try{ if(ctx && ctx.state==='running') ctx.suspend(); }catch(e){}
   }
+  function stopMusic(){
+    if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
+    started=false;
+  }
   document.addEventListener('visibilitychange', function(){
     try{
       if(document.visibilityState!=='visible'){ stopAll(); }
@@ -240,7 +244,7 @@ var Audio2 = (function(){
       musicGain.gain.setTargetAtTime(MUSIC_UP, ctx.currentTime + Math.max(0.2, seconds), 0.35);
     }catch(e){}
   }
-  return { init:init, resume:resume, startMusic:startMusic, sfx:SFX, duck:duck,
+  return { init:init, resume:resume, startMusic:startMusic, stopMusic:stopMusic, sfx:SFX, duck:duck,
            setMuted:setMuted, isMuted:isMuted,
            rawCtx:function(){ return ctx; }, voiceDest:function(){ return voiceGain; } };
 })();
@@ -286,7 +290,7 @@ var Voice = (function(){
   }
   function stop(){
     for(var i=0;i<live.length;i++){ try{ live[i].stop(); }catch(e){} }
-    live.length = 0;
+    live.length = 0; busyUntil = 0;
   }
   function say(ids, gap){
     if(!on) return;
@@ -307,12 +311,17 @@ var Voice = (function(){
           var step2 = b.duration + (gap===undefined?0.10:gap);
           t += step2; total += step2;
         }
-        if(total > 0) Audio2.duck(total);
+        if(total > 0){ Audio2.duck(total); busyUntil = ctx.currentTime + 0.04 + total; }
       });
     }catch(e){}
   }
+  var busyUntil = 0;
+  function isBusy(){
+    var ctx = Audio2.rawCtx();
+    return !!(on && ctx && ctx.currentTime < busyUntil);
+  }
   return {
-    say: say, warm: warm, stop: stop,
+    say: say, warm: warm, stop: stop, isBusy: isBusy,
     isOn: function(){ return on; },
     setOn: function(v){ on = v; LS.set('nina_voice', v?'1':'0'); if(!v) stop(); }
   };
@@ -561,7 +570,7 @@ function drawGirl(x,y,size,opt){
   fillCircle(-size*0.95,-size*0.74, size*0.13, '#ffd0e4');
 
   /* face */
-  var blink = (Math.sin(t*1.7+1.1)>0.965);
+  var blink = opt.asleep || (Math.sin(t*1.7+1.1)>0.965);
   ctx.fillStyle=C.ink;
   if(blink){
     ctx.lineWidth=size*0.09; ctx.strokeStyle=C.ink; ctx.lineCap='round';
@@ -648,7 +657,7 @@ function drawCar(x,y,w,t,tilt){
 /* ---------------------------- the people ---------------------------------- */
 /* Recipients: mum, dad, grandma, teacher, the brothers, a friend.  Trousers or a
    dress, never a dress by default -- the old version put Daddy in a skirt. */
-function drawPerson(x,y,size,kind,t,happy){
+function drawPerson(x,y,size,kind,t,happy,asleep){
   ctx.save(); ctx.translate(x,y);
   ctx.translate(0, Math.sin(t*3)*size*0.05);
   if(kind.shorter) ctx.translate(0, size*0.22);
@@ -656,7 +665,11 @@ function drawPerson(x,y,size,kind,t,happy){
   var S       = kind.skin || C.skin;
   var bodyTop = size*0.85;
   var hipY    = bodyTop + size*1.05;
-  var footY   = bodyTop + size*2.50;   /* same for trousers and dresses, so the
+  var footY   = bodyTop + size*2.50;
+  /* the children are smaller than the grown-ups and Daddy is the tallest --
+     scaled about the soles so everyone still stands on the same grass line */
+  var sc = kind.kid? 0.78 : (kind.tall? 1.08 : 1);
+  if(sc!==1){ var sole = footY + size*0.32; ctx.translate(0, sole*(1-sc)); ctx.scale(sc,sc); }   /* same for trousers and dresses, so the
                                           delivery scene can stand anyone on the grass */
 
   /* ---- hair behind the head ---- */
@@ -737,16 +750,29 @@ function drawPerson(x,y,size,kind,t,happy){
   /* ---- head ---- */
   fillCircle(0,0,size,S);
   ctx.fillStyle = kind.hair;
-  ctx.beginPath();
-  ctx.arc(0,0,size*1.05, Math.PI*1.0, Math.PI*2.0);
-  ctx.quadraticCurveTo(0,-size*0.28, -size*1.05, -size*0.05);
-  ctx.closePath(); ctx.fill();
+  if(kind.short){
+    /* a neat short crop with a high hairline and a quiff swept to one side --
+       Daddy used to wear a flat blue cap that read as a blue skull at game size */
+    ctx.beginPath();
+    ctx.arc(0,0,size*1.06, Math.PI*1.0, Math.PI*2.0);
+    ctx.quadraticCurveTo( size*0.62,-size*0.48,  size*0.12,-size*0.60);
+    ctx.quadraticCurveTo(-size*0.42,-size*0.72, -size*1.06,-size*0.04);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(size*0.20,-size*0.98, size*0.50, size*0.20, -0.25, 0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-size*0.98, size*0.12, size*0.14, size*0.34, 0, 0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( size*0.98, size*0.12, size*0.14, size*0.34, 0, 0,TAU); ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.arc(0,0,size*1.05, Math.PI*1.0, Math.PI*2.0);
+    ctx.quadraticCurveTo(0,-size*0.28, -size*1.05, -size*0.05);
+    ctx.closePath(); ctx.fill();
+  }
   if(kind.bob){
     /* two soft lengths framing the jaw -- clearly shorter than Nina's */
     ctx.beginPath(); ctx.ellipse(-size*0.98, size*0.22, size*0.32, size*0.72, 0.10,0,TAU); ctx.fill();
     ctx.beginPath(); ctx.ellipse( size*0.98, size*0.22, size*0.32, size*0.72,-0.10,0,TAU); ctx.fill();
   }
-  if(kind.bun){ fillCircle(0,-size*1.15,size*0.45,kind.hair); }
+  if(kind.bun){ fillCircle(0,-size*1.08,size*0.36,kind.hair); }
   if(kind.curls){
     /* soft grey curls around the hairline */
     for(var cu=0; cu<7; cu++){
@@ -762,10 +788,16 @@ function drawPerson(x,y,size,kind,t,happy){
   }
 
   /* ---- face ---- */
-  fillCircle(-size*0.33,-size*0.06,size*0.14,C.ink);
-  fillCircle( size*0.33,-size*0.06,size*0.14,C.ink);
-  fillCircle(-size*0.28,-size*0.12,size*0.055,C.white);
-  fillCircle( size*0.38,-size*0.12,size*0.055,C.white);
+  if(asleep){
+    ctx.strokeStyle=C.ink; ctx.lineWidth=size*0.09; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(-size*0.33,-size*0.10,size*0.15, 0.25, Math.PI-0.25); ctx.stroke();
+    ctx.beginPath(); ctx.arc( size*0.33,-size*0.10,size*0.15, 0.25, Math.PI-0.25); ctx.stroke();
+  } else {
+    fillCircle(-size*0.33,-size*0.06,size*0.14,C.ink);
+    fillCircle( size*0.33,-size*0.06,size*0.14,C.ink);
+    fillCircle(-size*0.28,-size*0.12,size*0.055,C.white);
+    fillCircle( size*0.38,-size*0.12,size*0.055,C.white);
+  }
   if(kind.glasses){
     ctx.strokeStyle='#5a4a62'; ctx.lineWidth=size*0.07;
     circle(-size*0.33,-size*0.06,size*0.28); ctx.stroke();
@@ -862,6 +894,7 @@ function burst(x,y,n,col,opt){
   }
 }
 function updateParts(dt){
+  updatePops(dt);
   for(var i=PARTS.length-1;i>=0;i--){
     var p=PARTS[i];
     p.age += dt;
@@ -871,7 +904,28 @@ function updateParts(dt){
     if(p.y > H+80) { PARTS.splice(i,1); }
   }
 }
+/* big floating words: the numeral she hears, the colour she is told, the
+   letter she just found -- print on screen at the moment it is spoken */
+var POPS = [];
+function popText(str, x, y, col, size){
+  POPS.push({s:str, x:x, y:y, col:col||'#ffffff', sz:size||U*11, t:0, life:1.25});
+  if(POPS.length>6) POPS.shift();
+}
+function updatePops(dt){
+  for(var i=POPS.length-1;i>=0;i--){ var p=POPS[i]; p.t+=dt; if(p.t>=p.life) POPS.splice(i,1); }
+}
+function drawPops(){
+  for(var i=0;i<POPS.length;i++){
+    var p=POPS[i], k=p.t/p.life;
+    var grow = k<0.18? (0.4+0.6*Math.sin(k/0.18*Math.PI/2)) : 1;
+    var y = p.y - Math.pow(k,0.7)*U*16;
+    ctx.save(); ctx.globalAlpha = k<0.7? 1 : 1-(k-0.7)/0.3;
+    bigText(p.s, p.x, y, p.sz*grow, p.col, 'rgba(255,255,255,0.95)');
+    ctx.restore();
+  }
+}
 function drawParts(){
+  drawPops();
   for(var i=0;i<PARTS.length;i++){
     var p=PARTS[i], k=1-p.age/p.life;
     ctx.globalAlpha = clamp(k*1.4,0,1);
@@ -902,8 +956,22 @@ var G = {
   roundIndex: parseInt(LS.get('nina_round')||'0',10) || 0,
   garden: null,          /* [{stage, col}] x4 -- survives between visits */
   wordIndex: parseInt(LS.get('nina_word')||'0',10) || 0,
-  personIndex: parseInt(LS.get('nina_person')||'0',10) || 0
+  personIndex: parseInt(LS.get('nina_person')||'0',10) || 0,
+  napUntil: parseInt(LS.get('nina_nap_until')||'0',10) || 0,
+  playT: 0, saveT: 0
 };
+/* The play budget: PLAY_MINUTES of actual play, then nap time, and the game
+   stays asleep for NAP_MINUTES. Minutes already used still count after a reopen
+   until the nap has passed, so closing and reopening the page buys nothing. */
+var PLAY_MINUTES = 6, NAP_MINUTES = 60;
+function napActive(){ return G.napUntil > Date.now(); }
+(function(){
+  var lastPlay = parseInt(LS.get('nina_lastPlay')||'0',10) || 0;
+  if(Date.now() - lastPlay < NAP_MINUTES*60000){
+    G.playT = parseInt(LS.get('nina_playT')||'0',10) || 0;
+    if(G.playT >= PLAY_MINUTES*60) G.napUntil = Math.max(G.napUntil, lastPlay + NAP_MINUTES*60000);
+  }
+})();
 function addStars(n){
   G.stars += n;
   if(G.stars > G.best){ G.best = G.stars; LS.set('nina_best', G.best); }
@@ -945,11 +1013,14 @@ var PEOPLE = [
   {id:'mom',     label:'Mommy',   hair:'#7b4a24', hairDark:'#5e3418', bob:true,
                  dress:'#3fbfa8', collar:'#eafaf6', belt:'#f0b429', earring:'#ff4f95',
                  shoe:'#e0498d'},
-  {id:'grandma', label:'Grandma', hair:'#e2e2ec', hairDark:'#c8c8d6', bun:true, curls:true,
-                 glasses:true, dress:'#c9a7e8', cardigan:'#f7d9e8', buttons:'#fff6fb',
-                 necklace:'#ffd873', shoe:'#8f5fe0', shorter:true},
-  {id:'dad',     label:'Daddy',   hair:'#4a3020', hairDark:'#3a2416',
-                 shirt:'#6fc9ff', pants:'#3d5f86', belt:'#2b4360', cap:'#4aa3e0',
+  /* Grandma: long silver hair, glasses, an elegant dress -- classic, not
+     antiquated. The first version stacked a bun, seven curl circles and a
+     cardigan into a grey cloud and looked, in Jeremy's words, goofy. */
+  {id:'grandma', label:'Grandma', hair:'#e6e6f0', hairDark:'#c4c4d8', longHair:true,
+                 glasses:true, dress:'#b9a2e6', collar:'#fff6fb', belt:'#e9c8f2',
+                 necklace:'#ffd873', shoe:'#8f5fe0'},
+  {id:'dad',     label:'Daddy',   hair:'#4a3020', hairDark:'#3a2416', short:true, tall:true,
+                 shirt:'#6fc9ff', pants:'#3d5f86', belt:'#2b4360', collar:'#eaf7ff',
                  shoe:'#2f4256'},
   {id:'teacher', label:'my teacher', hair:'#3a2a1a', hairDark:'#2a1c10', bun:true, glasses:true,
                  dress:'#7ee0a8', collar:'#ffffff', belt:'#3fa870', shoe:'#3fa870'},
@@ -961,11 +1032,11 @@ var PEOPLE = [
                  kid:true, dress:'#ffb3d9', collar:'#ffffff', shoe:'#ff5fa3'}
 ];
 
-var WORDS = ['NINA','CAT','DOG','MOM','DAD','SUN','THEO','BUS','OLIVER'];
+var WORDS = ['NINA','CAT','DOG','MOM','DAD','SUN','CAR','THEO','BUS','BEE','PIG','OLIVER','HAT'];
 
 /* Scenes run in a gentle, predictable loop -- a 3-year-old should always be
    able to guess what comes next. */
-var CYCLE = ['drive','garden','deliver','drive','letters','deliver'];
+var CYCLE = ['drive','garden','deliver','drive','letters','deliver','drive','goats','deliver'];
 
 /* ============================ shared backdrop ============================= */
 var cloudSeed = [];
@@ -1020,6 +1091,9 @@ var Drive = (function(){
     return W/2 + Math.sin(wy*0.0022)*W*0.085 + Math.sin(wy*0.00071+1.7)*W*0.055;
   }
   function roadHalf(){ return Math.min(W*0.325, H*0.24); }
+  /* a creek runs down the left of the road, meandering with it */
+  function creekX(wy){ return roadCX(wy) - roadHalf() - U*12 + Math.sin(wy*0.0016+0.8)*U*3.5; }
+  var CREEK_HALF = 3.2;
 
   function enter(){
     s = {
@@ -1037,15 +1111,18 @@ var Drive = (function(){
     /* put scenery on whichever side of the path actually has room, or the
        curve carries it off the edge of the screen and the grass looks bare */
     var cx = roadCX(wy), half = roadHalf();
-    var leftRoom = cx - half, rightRoom = W - (cx + half);
+    var leftRoom = cx - half - U*20, rightRoom = W - (cx + half);   /* the creek takes the first strip on the left */
     var side;
-    if(leftRoom  < U*16) side = 1;
+    if(leftRoom  < U*12) side = 1;
     else if(rightRoom < U*16) side = -1;
-    else side = Math.random()<0.5? -1 : 1;
+    else side = Math.random()<0.4? -1 : 1;
     var room = (side<0? leftRoom : rightRoom);
-    var off = half + clamp(rnd(U*4, U*15), U*3, Math.max(U*4, room - U*9));
-    s.deco.push({ wy:wy, side:side, off:off,
-      kind: pick(['tree','bush','flower','flower','rock','butterfly']),
+    var base = half + (side<0? U*20 : 0);
+    var kind = pick(['tree','bush','flower','flower','rock','butterfly','pine','pine','peak','peak']);
+    if(kind==='peak' && (side<0 || room < U*8)) kind = 'pine';    /* the peaks sit on the right bank, half off the edge on a phone */
+    var off = base + clamp(rnd(U*4, U*15), U*3, Math.max(U*4, room - U*9));
+    if(kind==='peak') off = base + clamp(room - U*4 + rnd(0, U*10), U*8, U*40);
+    s.deco.push({ wy:wy, side:side, off:off, kind:kind,
       col: pick(FLOWER_COLORS), ph: rnd(0,TAU), sz: rnd(0.8,1.3) });
   }
 
@@ -1122,6 +1199,7 @@ var Drive = (function(){
       burst(x,y,10,it.col.hex,{kind:'petal',up:60});
       addStars(1);
       Voice.say('n'+s.picked);
+      popText(''+s.picked, x, y-U*9, '#ff6fae');
       s.popTimer = 0.6;
       if(s.picked >= NEED){
         s.done = true; s.doneT = 0;
@@ -1148,11 +1226,33 @@ var Drive = (function(){
   function draw(t){
     drawGrassGround(0);   /* pure top-down: no horizon to draw */
 
+    /* the creek: a bright ribbon with ripples and a stony bank */
+    var steps = 26, y, wy;
+    ctx.fillStyle='#79c7f5';
+    ctx.beginPath();
+    for(var ci=0; ci<=steps; ci++){ y=ci*H/steps; wy=s.scroll+H-y; if(ci===0) ctx.moveTo(creekX(wy)-U*CREEK_HALF, y); else ctx.lineTo(creekX(wy)-U*CREEK_HALF, y); }
+    for(var cj=steps; cj>=0; cj--){ y=cj*H/steps; wy=s.scroll+H-y; ctx.lineTo(creekX(wy)+U*CREEK_HALF, y); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#5aaee0'; ctx.lineWidth=U*0.7;
+    for(var ce=-1; ce<=1; ce+=2){ ctx.beginPath();
+      for(var ck=0; ck<=steps; ck++){ y=ck*H/steps; wy=s.scroll+H-y; var cxx=creekX(wy)+ce*U*CREEK_HALF; if(ck===0) ctx.moveTo(cxx,y); else ctx.lineTo(cxx,y); }
+      ctx.stroke(); }
+    ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=U*0.6; ctx.lineCap='round';
+    var rip = H*0.06, r0 = Math.floor((s.scroll - t*U*40)/rip)*rip;
+    for(var rp=0; rp<20; rp++){ var rwy = r0 + rp*rip, rsy = H - (rwy - s.scroll + t*U*40 - Math.floor(t*U*40/rip)*rip);
+      if(rsy<-10||rsy>H+10) continue;
+      var rx = creekX(rwy) + Math.sin(rp*2.3)*U*1.2;
+      ctx.beginPath(); ctx.arc(rx, rsy, U*1.2, Math.PI*1.15, Math.PI*1.85); ctx.stroke(); }
+    var st0 = Math.floor(s.scroll/(H*0.28))*(H*0.28);
+    for(var sn=0; sn<6; sn++){ var swy = st0 + sn*H*0.28, ssy = H-(swy-s.scroll); if(ssy<-20||ssy>H+20) continue;
+      var sside = (sn+Math.floor(swy/(H*0.28)))%2? 1:-1;
+      fillCircle(creekX(swy)+sside*U*(CREEK_HALF+1.6), ssy, U*1.5, '#c9c4bd'); fillCircle(creekX(swy)+sside*U*(CREEK_HALF+1.6)-U*0.4, ssy-U*0.4, U*0.6, 'rgba(255,255,255,0.5)'); }
+
     /* the winding path */
     var half = roadHalf();
     ctx.fillStyle = C.path;
     ctx.beginPath();
-    var steps = 26, y, wy, cxv;
+    var cxv;
     ctx.moveTo(roadCX(s.scroll+H)-half, 0);
     for(var i=0;i<=steps;i++){
       y = i*H/steps; wy = s.scroll + H - y;
@@ -1260,6 +1360,25 @@ var Drive = (function(){
       fillCircle(x+sz*1.7,y+sz*0.5,sz*1.8,'#7ad86b');
     } else if(dc.kind==='flower'){
       drawFlower(x, y-sz*2.6, sz*1.5, dc.col, dc.ph, true, sz*2.8);
+    } else if(dc.kind==='pine'){
+      ctx.fillStyle='rgba(0,0,0,0.13)';
+      ctx.beginPath(); ctx.ellipse(x,y+sz*4.2,sz*3.2,sz*1.0,0,0,TAU); ctx.fill();
+      ctx.fillStyle='#8a5a34'; rr(x-sz*0.6, y+sz*1.5, sz*1.2, sz*2.8, sz*0.3); ctx.fill();
+      var cols=['#2f8f3f','#3ea34e','#52b65f'];
+      for(var pl=0; pl<3; pl++){ var py=y+sz*1.6-pl*sz*1.9, pw=sz*(3.4-pl*0.8);
+        ctx.fillStyle=cols[pl]; ctx.beginPath(); ctx.moveTo(x-pw, py); ctx.lineTo(x, py-sz*2.6); ctx.lineTo(x+pw, py); ctx.closePath(); ctx.fill(); }
+    } else if(dc.kind==='peak'){
+      /* a rocky peak with a snow cap, seen from the road */
+      var pk=sz*5.5;
+      ctx.fillStyle='rgba(0,0,0,0.12)';
+      ctx.beginPath(); ctx.ellipse(x,y+pk*0.9,pk*1.9,pk*0.5,0,0,TAU); ctx.fill();
+      ctx.fillStyle='#9aa3ad';
+      ctx.beginPath(); ctx.moveTo(x-pk*1.8, y+pk*0.8); ctx.lineTo(x-pk*0.1, y-pk*1.9); ctx.lineTo(x+pk*1.8, y+pk*0.8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#7d8791';
+      ctx.beginPath(); ctx.moveTo(x-pk*0.1, y-pk*1.9); ctx.lineTo(x+pk*1.8, y+pk*0.8); ctx.lineTo(x+pk*0.3, y+pk*0.8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.moveTo(x-pk*0.1, y-pk*1.9); ctx.lineTo(x+pk*0.62, y-pk*0.85); ctx.lineTo(x+pk*0.3, y-pk*0.95);
+      ctx.lineTo(x+pk*0.05, y-pk*0.72); ctx.lineTo(x-pk*0.25, y-pk*0.95); ctx.lineTo(x-pk*0.62, y-pk*0.85); ctx.closePath(); ctx.fill();
     } else if(dc.kind==='rock'){
       ctx.fillStyle='#c9c4bd';
       ctx.beginPath(); ctx.ellipse(x,y,sz*1.7,sz*1.2,dc.ph,0,TAU); ctx.fill();
@@ -1365,15 +1484,21 @@ var Garden = (function(){
       for(var i=0;i<s.plots.length;i++){
         var p=s.plots[i];
         if(p.stage>=s.target) continue;      /* already grown as far as it goes today */
-        if(dist2(spx, spy, p.x, p.y - p.r*0.6) < (p.r*1.55)*(p.r*1.55)){ over=p; break; }
+        /* the spout OR the finger itself: a small hand puts the finger on the plant,
+           and the spout hangs 40px away from it. Nina needed her brothers for this. */
+        var tx0=p.x, ty0=p.y - p.r*0.6;
+        if(dist2(spx, spy, tx0, ty0) < (p.r*1.55)*(p.r*1.55) ||
+           dist2(P.x, P.y, tx0, ty0) < (p.r*1.45)*(p.r*1.45)){ over=p; break; }
       }
     }
-    s.pouring = !!over;
+    s.pouring = !!over; s.over = over;
     s.tip = lerp(s.tip, s.pouring? -0.55 : 0, 0.2);
 
     if(over){
       s.hint = 0;
       over.water += dt;
+      if(P.justDown){ over.water += 0.30; Audio2.sfx.water();   /* a tap is a splash, so tapping works too */
+        burst(over.x, over.y - over.r*0.7, 6, 'rgba(130,205,255,0.95)', {kind:'drop', up:120, g:600}); }
       if(Math.random() < dt*46){
         spawnPart({ x:spx-U*1.6+rnd(-U,U), y:spy+U*0.5, vx:rnd(-30,-90), vy:rnd(120,260),
           g:900, life:rnd(0.35,0.6), r:rnd(U*0.5,U*1.1), col:'rgba(130,205,255,0.95)', kind:'drop' });
@@ -1390,6 +1515,7 @@ var Garden = (function(){
           G.bouquet.push(over.col);
           addStars(5);
           Voice.say('c_'+over.col.name);
+          popText(over.col.name.toUpperCase(), over.x, over.y-over.r*2.6, over.col.dark, U*7);
           var allDone = s.plots.every(function(q){ return q.stage>=s.target; });
           if(allDone){
             s.done = true; s.doneT = 0;
@@ -1441,6 +1567,11 @@ var Garden = (function(){
     ctx.fillStyle='#6b4a2f';
     ctx.beginPath(); ctx.ellipse(p.x, p.y-r*0.44, r*0.86, r*0.20, 0,0,TAU); ctx.fill();
 
+    /* the plant being watered glows, so she can see which one is drinking */
+    if(s.over===p){
+      ctx.save(); ctx.globalAlpha=0.35+0.2*Math.sin(t*8);
+      ctx.strokeStyle='#9fe0ff'; ctx.lineWidth=r*0.14; circle(p.x, p.y-r*0.6, r*1.5); ctx.stroke(); ctx.restore();
+    }
     var pop = 1 + p.pop*0.35;
     var base = p.y - r*0.52;
     ctx.save(); ctx.translate(p.x, base); ctx.scale(pop,pop); ctx.translate(-p.x,-base);
@@ -1533,8 +1664,18 @@ var Garden = (function(){
     drawParts();
     drawCan(s.canX, s.canY, U*7.2, s.tip);
 
+    /* every plant that still wants water shows a droplet (the seed already does) */
+    for(var dp=0; dp<s.plots.length; dp++){ var pq=s.plots[dp];
+      if(pq.stage>0 && pq.stage<s.target && s.over!==pq){
+        var dyy = pq.y - pq.r*(pq.stage===1? 1.35 : 2.15) - Math.abs(Math.sin(t*2.6+pq.ph))*pq.r*0.22;
+        ctx.save(); ctx.globalAlpha=0.55+0.3*Math.sin(t*3+pq.ph); ctx.fillStyle='#5ec8ff';
+        ctx.beginPath(); ctx.moveTo(pq.x, dyy-pq.r*0.22);
+        ctx.bezierCurveTo(pq.x+pq.r*0.18, dyy, pq.x+pq.r*0.15, dyy+pq.r*0.18, pq.x, dyy+pq.r*0.18);
+        ctx.bezierCurveTo(pq.x-pq.r*0.15, dyy+pq.r*0.18, pq.x-pq.r*0.18, dyy, pq.x, dyy-pq.r*0.22);
+        ctx.closePath(); ctx.fill(); ctx.restore(); } }
     if(s.hint>0 && !P.down){
       var p0 = s.plots[0];
+      for(var hp=0; hp<s.plots.length; hp++){ if(s.plots[hp].stage<s.target){ p0=s.plots[hp]; break; } }
       var a = 0.5+0.5*Math.sin(t*4);
       ctx.save(); ctx.globalAlpha=a;
       ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineWidth=U*0.9;
@@ -1613,7 +1754,14 @@ var Deliver = (function(){
         var d = dist2(P.x,P.y,f.x,f.y);
         if(d<bd && d < (U*15)*(U*15)){ bd=d; best=f; }
       }
-      if(best){ best.held=true; s.drag=best; }
+      if(best){
+        best.held=true; s.drag=best;
+        /* name the colour as she lifts it -- unless the narrator is mid-sentence */
+        if(!Voice.isBusy()){
+          Voice.say('c_'+best.col.name);
+          popText(best.col.name.toUpperCase(), best.x, best.y-U*12, best.col.dark, U*8);
+        }
+      }
     }
     if(s.drag){
       /* hold the flower well above the finger so a small hand can see it */
@@ -1646,6 +1794,7 @@ var Deliver = (function(){
     burst(s.px, s.py+ps*0.6, 16, C.pink, {kind:'heart', up:150, g:260});
     burst(s.px, s.py+ps*0.6, 10, f.col.hex, {kind:'petal', up:120, g:300});
     Voice.say('n'+s.given);
+    popText(''+s.given, s.px, s.py-ps*2.4, '#ff6fae');
     if(s.given >= s.flowers.length){
       s.done = true; s.doneT = 0;
       setTimeout(function(){
@@ -1811,6 +1960,7 @@ var Letters = (function(){
       s.at++; s.flash=0.6;
       Audio2.sfx.pickup(s.at-1);
       addStars(3);
+      popText(ch, x, y-U*10, '#ff6fae', U*14);
       burst(x,y,16,'#ffd93d',{kind:'star',up:130});
 
       /* clear the rest of this row so she can't "miss" it after winning */
@@ -1914,8 +2064,552 @@ var Letters = (function(){
   return { enter:enter, update:update, draw:draw, onResize:onResize };
 })();
 
+/* ================================ GOATS =================================== */
+/* Three goats, three personalities, three ways to get a flower back:
+     MUNCHY  white and greedy      -- hold out an apple or a pear; she trots over and eats it
+     FLUFFY  grey and shy          -- pet her: keep a finger on her back until the hearts come
+     PEAK    a mountain goat       -- tap her and she leaps onto the rock, picks the flower
+                                      growing up there, and brings it down for you
+   Tap any goat and it hops and bleats. Nothing can go wrong. */
+function drawFruit(x,y,s,kind,rot){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0);
+  if(kind==='apple'){
+    fillCircle(-s*0.38, s*0.05, s*0.72, '#ff4d5e');
+    fillCircle( s*0.38, s*0.05, s*0.72, '#ff4d5e');
+    fillCircle(0, s*0.18, s*0.78, '#ff4d5e');
+    ctx.fillStyle='#7a4b2a'; rr(-s*0.08,-s*0.95, s*0.16, s*0.50, s*0.08); ctx.fill();
+    ctx.fillStyle='#6cc04a';
+    ctx.beginPath(); ctx.ellipse(s*0.36,-s*0.78, s*0.36, s*0.17, -0.6, 0,TAU); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.beginPath(); ctx.ellipse(-s*0.42,-s*0.28, s*0.22, s*0.14, -0.6, 0,TAU); ctx.fill();
+  } else {
+    fillCircle(0, s*0.28, s*0.78, '#c9e26b');
+    fillCircle(0,-s*0.42, s*0.50, '#c9e26b');
+    ctx.fillStyle='#c9e26b'; rr(-s*0.5,-s*0.42, s*1.0, s*0.7, s*0.3); ctx.fill();
+    ctx.fillStyle='#7a4b2a'; rr(-s*0.07,-s*1.15, s*0.14, s*0.45, s*0.07); ctx.fill();
+    ctx.fillStyle='#6cc04a';
+    ctx.beginPath(); ctx.ellipse(s*0.30,-s*0.98, s*0.32, s*0.15, -0.5, 0,TAU); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.beginPath(); ctx.ellipse(-s*0.32, s*0.05, s*0.20, s*0.14, -0.6, 0,TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+var GOAT_LOOK = {
+  feed:  { coat:'#f6f3ec', leg:'#e3ded5', horn:'#d9b26a' },
+  pet:   { coat:'#d8d3cc', leg:'#c4beb4', horn:'#cfae7a' },
+  climb: { coat:'#dcbf93', leg:'#c9a877', horn:'#8a6a3e' }
+};
+function drawGoat(x,y,s,g,t){
+  var kind = g.kind||'feed', L = GOAT_LOOK[kind], hop = g.hop||0;
+  var eating = g.st==='eat', picking = g.st==='pick', petted = !!g.petting;
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='rgba(0,0,0,0.14)';
+  ctx.beginPath(); ctx.ellipse(0, s*0.98, s*1.5, s*0.34, 0,0,TAU); ctx.fill();
+  ctx.translate(0,hop);
+  if(g.dir>0) ctx.scale(-1,1);           /* drawn facing left; flipped to face right */
+  var trot = g.moving? Math.sin(t*14+(g.t||0)) : 0;
+  var bob  = g.moving? Math.abs(Math.sin(t*14+(g.t||0)))*s*0.10 : 0;
+  var legL = kind==='climb'? s*0.92 : s*0.80;
+  ctx.translate(0,-bob-(legL-s*0.80));
+  /* legs */
+  ctx.fillStyle=L.leg;
+  rr(-s*0.92, s*0.15, s*0.30, legL+trot*s*0.12, s*0.12); ctx.fill();
+  rr(-s*0.40, s*0.15, s*0.30, legL-trot*s*0.12, s*0.12); ctx.fill();
+  rr( s*0.25, s*0.15, s*0.30, legL-trot*s*0.12, s*0.12); ctx.fill();
+  rr( s*0.72, s*0.15, s*0.30, legL+trot*s*0.12, s*0.12); ctx.fill();
+  ctx.fillStyle='#6b5b4a';
+  rr(-s*0.92, s*0.02+legL+trot*s*0.12, s*0.30, s*0.16, s*0.06); ctx.fill();
+  rr(-s*0.40, s*0.02+legL-trot*s*0.12, s*0.30, s*0.16, s*0.06); ctx.fill();
+  rr( s*0.25, s*0.02+legL-trot*s*0.12, s*0.30, s*0.16, s*0.06); ctx.fill();
+  rr( s*0.72, s*0.02+legL+trot*s*0.12, s*0.30, s*0.16, s*0.06); ctx.fill();
+  /* body */
+  ctx.fillStyle=L.coat;
+  var bh = kind==='feed'? s*1.32 : s*1.18;                 /* Munchy is round */
+  rr(-s*1.22, -s*0.78, s*2.35, bh, s*0.55); ctx.fill();
+  if(kind==='pet'){                                         /* Fluffy: a woolly back */
+    for(var w=0; w<6; w++) fillCircle(-s*1.0+w*s*0.40, -s*0.78+Math.sin(w*1.7)*s*0.04, s*0.30, L.coat);
+  }
+  if(kind==='climb'){                                       /* Peak: a white chest */
+    ctx.fillStyle='#fbf6ea'; ctx.beginPath(); ctx.ellipse(-s*0.85, -s*0.15, s*0.42, s*0.52, 0.3, 0,TAU); ctx.fill();
+  }
+  ctx.fillStyle='rgba(0,0,0,0.05)';
+  ctx.beginPath(); ctx.ellipse(0, s*0.15, s*0.9, s*0.25, 0,0,TAU); ctx.fill();
+  /* tail */
+  ctx.fillStyle=L.coat;
+  ctx.beginPath(); ctx.moveTo(s*1.05,-s*0.55); ctx.lineTo(s*1.45,-s*1.05+Math.sin(t*9)*s*0.1); ctx.lineTo(s*1.15,-s*0.25); ctx.closePath(); ctx.fill();
+  /* neck and head */
+  var cy = (eating||picking)? -s*0.50 : (kind==='climb'? -s*1.45 : -s*1.30);
+  ctx.beginPath(); ctx.moveTo(-s*1.05,-s*0.75); ctx.lineTo(-s*1.55, cy); ctx.lineTo(-s*1.15, cy+s*0.25); ctx.lineTo(-s*0.7,-s*0.3); ctx.closePath(); ctx.fill();
+  var chew = eating? 1+Math.abs(Math.sin(t*16))*0.08 : 1;
+  ctx.beginPath(); ctx.ellipse(-s*1.60, cy, s*0.58, s*0.46*chew, 0,0,TAU); ctx.fill();
+  if(kind==='pet'){ fillCircle(-s*1.55, cy-s*0.42, s*0.26, L.coat); fillCircle(-s*1.80, cy-s*0.36, s*0.20, L.coat); }
+  /* ear */
+  ctx.beginPath(); ctx.ellipse(-s*1.28, cy-s*0.22, s*0.32, s*0.14, 0.55, 0,TAU); ctx.fill();
+  /* horns: Peak's sweep back, big and curved */
+  ctx.strokeStyle=L.horn; ctx.lineCap='round';
+  if(kind==='climb'){
+    ctx.lineWidth=s*0.20;
+    ctx.beginPath(); ctx.moveTo(-s*1.45, cy-s*0.40); ctx.quadraticCurveTo(-s*1.30, cy-s*1.25, -s*0.55, cy-s*1.15); ctx.stroke();
+    ctx.lineWidth=s*0.16;
+    ctx.beginPath(); ctx.moveTo(-s*1.70, cy-s*0.42); ctx.quadraticCurveTo(-s*1.62, cy-s*1.15, -s*0.95, cy-s*1.20); ctx.stroke();
+  } else {
+    ctx.lineWidth=s*0.13;
+    ctx.beginPath(); ctx.moveTo(-s*1.45, cy-s*0.40); ctx.quadraticCurveTo(-s*1.35, cy-s*0.85, -s*1.05, cy-s*0.95); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-s*1.70, cy-s*0.42); ctx.quadraticCurveTo(-s*1.66, cy-s*0.85, -s*1.40, cy-s*1.00); ctx.stroke();
+  }
+  /* beard, snout, eye */
+  ctx.fillStyle=L.leg;
+  ctx.beginPath(); ctx.moveTo(-s*1.75, cy+s*0.38); ctx.lineTo(-s*1.55, cy+s*0.40); ctx.lineTo(-s*1.66, cy+s*0.70); ctx.closePath(); ctx.fill();
+  fillCircle(-s*2.05, cy+s*0.12, s*0.17, '#f0b0b8');
+  if(petted || g.st==='done' && kind==='pet'){
+    ctx.strokeStyle=C.ink; ctx.lineWidth=s*0.07;
+    ctx.beginPath(); ctx.arc(-s*1.78, cy-s*0.10, s*0.11, Math.PI+0.3, TAU-0.3); ctx.stroke();   /* happy closed eye */
+  } else {
+    fillCircle(-s*1.78, cy-s*0.12, s*0.085, C.ink);
+    fillCircle(-s*1.75, cy-s*0.15, s*0.03, C.white);
+    if(kind==='pet'){ ctx.strokeStyle=C.ink; ctx.lineWidth=s*0.04;               /* lashes */
+      ctx.beginPath(); ctx.moveTo(-s*1.86, cy-s*0.20); ctx.lineTo(-s*1.94, cy-s*0.28); ctx.stroke(); }
+  }
+  if(g.st==='done'){ ctx.strokeStyle=C.ink; ctx.lineWidth=s*0.06; ctx.beginPath(); ctx.arc(-s*1.85, cy+s*0.18, s*0.16, 0.3, Math.PI-0.6); ctx.stroke(); }
+  /* accessories */
+  if(kind==='feed'){                                        /* Munchy: a red collar and a bell */
+    ctx.strokeStyle='#e0353f'; ctx.lineWidth=s*0.14;
+    ctx.beginPath(); ctx.moveTo(-s*1.32, cy+s*0.42); ctx.lineTo(-s*0.85, cy+s*0.78); ctx.stroke();
+    fillCircle(-s*1.08, cy+s*0.68, s*0.14, '#ffd93d'); fillCircle(-s*1.08, cy+s*0.72, s*0.04, '#a67c00');
+  }
+  if(kind==='pet'){                                         /* Fluffy: a pink bow */
+    ctx.fillStyle='#ff6fae';
+    ctx.beginPath(); ctx.ellipse(-s*1.10, cy-s*0.58, s*0.22, s*0.14, -0.5, 0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-s*1.42, cy-s*0.66, s*0.22, s*0.14,  0.5, 0,TAU); ctx.fill();
+    fillCircle(-s*1.26, cy-s*0.62, s*0.08, '#ffd0e4');
+  }
+  /* the flower, held in the mouth */
+  if(g.flower){
+    ctx.strokeStyle='#5fc456'; ctx.lineWidth=s*0.09;
+    ctx.beginPath(); ctx.moveTo(-s*2.05, cy+s*0.22); ctx.lineTo(-s*2.45, cy+s*0.05); ctx.stroke();
+    drawFlower(-s*2.55, cy-s*0.05, s*0.40, g.flower, Math.sin(t*3+(g.t||0))*0.2, false, 0);
+  }
+  ctx.restore();
+}
+
+var Goats = (function(){
+  var s=null;
+  var FRUITS=['apple','pear','apple','pear'];
+  var PET_NEED = 1.6;                     /* seconds of petting */
+  function field(){ return { x0:W*0.14, x1:W*0.70, y0:H*0.47, y1:H*0.70 }; }
+  function rock(){ return { x:W*0.82, y:H*0.50, w:U*22, h:U*16 }; }
+  function pickTarget(g){ var f=field(); g.tx=rnd(f.x0,f.x1); g.ty=rnd(f.y0,f.y1); g.wait=rnd(0.5,1.8); }
+  function enter(){
+    var src=G.basket.slice();
+    while(src.length<3) src.push(pick(FLOWER_COLORS));
+    var f=field(), r=rock();
+    s={ goats:[], fruits:[], got:[], done:false, doneT:0, t0:0, idle:0, drag:null, flying:[],
+        rockFlower:src[2], hinted:{}, hintT:0 };
+    s.goats.push({ kind:'feed',  name:'MUNCHY', x:W+U*14, y:f.y0+(f.y1-f.y0)*0.25, tx:0, ty:0, dir:-1, flower:src[0],
+                   st:'run', t:rnd(0,TAU), wait:0, hop:0, hopV:0, moving:true, eatT:0, pet:0 });
+    s.goats.push({ kind:'pet',   name:'FLUFFY', x:W+U*40, y:f.y0+(f.y1-f.y0)*0.75, tx:0, ty:0, dir:-1, flower:src[1],
+                   st:'run', t:rnd(0,TAU), wait:0, hop:0, hopV:0, moving:true, eatT:0, pet:0 });
+    s.goats.push({ kind:'climb', name:'PEAK',   x:r.x-r.w*0.9, y:r.y+U*4, tx:r.x-r.w*0.9, ty:r.y+U*4, dir:1, flower:null,
+                   st:'wait', t:rnd(0,TAU), wait:0, hop:0, hopV:0, moving:false, eatT:0, pet:0, leap:0 });
+    pickTarget(s.goats[0]); pickTarget(s.goats[1]);
+    for(var k=0;k<FRUITS.length;k++) s.fruits.push({ kind:FRUITS[k], x:0,y:0,hx:0,hy:0, held:false, gone:false, onGrass:false, goat:null, ph:rnd(0,TAU) });
+    layout();
+    G.basket=[];
+    Voice.say(['goats2','g_feed']); s.hinted.feed=true;
+  }
+  function layout(){
+    if(!s) return;
+    var by=H-U*15;
+    for(var i=0;i<s.fruits.length;i++){ var fr=s.fruits[i];
+      fr.hx=W*0.5+(i-1.5)*U*15; fr.hy=by;
+      if(!fr.held&&!fr.onGrass&&!fr.gone){ fr.x=fr.hx; fr.y=fr.hy; } }
+  }
+  function onResize(){ layout(); }
+  function slot(i){ return { x:U*11.5+i*U*5.4, y:U*10.5 }; }
+  function goatOf(kind){ for(var i=0;i<s.goats.length;i++) if(s.goats[i].kind===kind) return s.goats[i]; return null; }
+  function hasFlower(g){ return g.kind==='climb'? !!s.rockFlower : !!g.flower; }
+  function nextHint(){                     /* which goat still owes a flower, in teaching order */
+    var order=['feed','pet','climb'];
+    for(var i=0;i<order.length;i++){ var g=goatOf(order[i]); if(g && g.st!=='done' && hasFlower(g)) return g; }
+    return null;
+  }
+
+  function update(dt,t){
+    s.t0+=dt;
+    if(s.done){ s.doneT+=dt; updateParts(dt); updFlying(dt);
+      if(s.doneT>2.8) Scene.go('cheer',{kind:'goats'}); return; }
+    var f=field(), r=rock(), i, g;
+    if(P.down) s.idle=0; else s.idle+=dt;
+
+    /* spoken hint for whichever goat is next, once, after she has been idle a moment */
+    var nh=nextHint();
+    if(nh && !s.hinted[nh.kind] && s.idle>3.5 && !Voice.isBusy()){ s.hinted[nh.kind]=true; Voice.say('g_'+nh.kind); }
+
+    if(P.justDown){
+      var best=null, bd=1e9;
+      for(i=0;i<s.fruits.length;i++){ var fr=s.fruits[i]; if(fr.gone) continue;
+        var d=dist2(P.x,P.y,fr.x,fr.y); if(d<bd && d<(U*15)*(U*15)){ bd=d; best=fr; } }
+      if(best){
+        best.held=true; best.onGrass=false; s.drag=best;
+        if(!Voice.isBusy()){
+          Voice.say('f_'+best.kind);
+          popText(best.kind.toUpperCase(), best.x, best.y-U*12, best.kind==='apple'?'#e0353f':'#5aa63a', U*7);
+        }
+      } else {
+        /* the NEAREST goat gets the tap -- Munchy wandering past Peak used to swallow it */
+        var gg=null, gbd=1e9;
+        for(var j=0;j<s.goats.length;j++){ var gq=s.goats[j], gd2=dist2(P.x,P.y,gq.x,gq.y-U*5);
+          if(gq.kind==='climb' && gq.st==='wait' && s.rockFlower &&
+             P.x>r.x-r.w*0.7 && P.x<r.x+r.w*0.7 && P.y>r.y-r.h-U*8 && P.y<r.y+U*4) gd2=Math.min(gd2, (U*8)*(U*8));
+          if(gd2 < (U*15)*(U*15) && gd2<gbd){ gbd=gd2; gg=gq; } }
+        if(gg){
+          {
+            if(gg.kind==='climb' && gg.st==='wait' && s.rockFlower){
+              /* Peak leaps up onto the rock */
+              gg.st='leap'; gg.leap=0; gg.sx=gg.x; gg.sy=gg.y; gg.dir=1;
+              Audio2.sfx.gem(); popText(gg.name+'!', gg.x, gg.y-U*20, '#b8862b', U*6);
+            } else if(gg.st==='run' || gg.st==='done' || gg.st==='wait'){
+              /* any other goat: a hop and a bleat */
+              gg.hopV=-U*95; if(gg.st!=='wait'){ gg.dir=(P.x<gg.x)?1:-1; gg.tx=clamp(gg.x+gg.dir*U*28, f.x0, f.x1); gg.ty=clamp(gg.y+rnd(-U*8,U*8), f.y0, f.y1); gg.wait=1.0; }
+              Audio2.sfx.boop();
+              popText('BAA!', gg.x, gg.y-U*18, '#8f6fa8', U*6);
+            }
+          } }
+      }
+    }
+    if(s.drag){
+      s.drag.x=lerp(s.drag.x, P.x, 1-Math.pow(0.0001,dt));
+      s.drag.y=lerp(s.drag.y, P.y-U*12, 1-Math.pow(0.0001,dt));
+    }
+    if(P.justUp && s.drag){
+      var fd=s.drag; fd.held=false; s.drag=null;
+      if(fd.y < H*0.30){ fd.x=fd.hx; fd.y=fd.hy; fd.goat=null; }   /* dropped in the sky: back to the basket */
+      else { fd.onGrass=true; fd.y=Math.max(fd.y, f.y0-U*3); }
+    }
+
+    for(var gi=0;gi<s.goats.length;gi++){
+      g=s.goats[gi]; g.t+=dt; g.petting=false;
+      g.hopV+=U*320*dt; g.hop+=g.hopV*dt; if(g.hop>0){ g.hop=0; g.hopV=0; }
+
+      if(g.kind==='climb'){ updClimb(g,dt,r,f); continue; }
+      if(g.st==='eat'){ g.eatT-=dt; g.moving=false; if(g.eatT<=0) finishEat(g); continue; }
+
+      /* FLUFFY: a finger resting on her back is a pet. She stops for it. */
+      if(g.kind==='pet' && g.flower && P.down && !s.drag && dist2(P.x,P.y,g.x,g.y-U*4) < (U*13)*(U*13)){
+        var moved = Math.abs(P.x-P.px)+Math.abs(P.y-P.py) > 0.5;
+        g.pet += dt*(moved?1.6:1.0); g.petting=true; g.moving=false;
+        if(Math.random()<dt*6) spawnPart({x:g.x+rnd(-U*6,U*6), y:g.y-U*10, vx:rnd(-10,10), vy:rnd(-45,-20), g:-20,
+          life:rnd(0.7,1.1), r:U*0.9, col:'#ff6fae', kind:'heart'});
+        if(g.pet>=PET_NEED){ g.pet=0; g.st='done'; returnFlower(g, g.flower); g.flower=null; Audio2.sfx.bloom(); }
+        continue;
+      }
+
+      var want=null, bd2=1e9;
+      if(g.kind==='feed' || g.st==='done'){
+        for(var fi=0;fi<s.fruits.length;fi++){ var fr2=s.fruits[fi];
+          if(fr2.gone || (!fr2.held && !fr2.onGrass)) continue;
+          if(fr2.goat && fr2.goat!==g) continue;
+          var d2=dist2(g.x,g.y,fr2.x,fr2.y); if(d2<bd2){ bd2=d2; want=fr2; } }
+      }
+      if(want){ if(!want.goat) want.goat=g; g.tx=want.x+(g.x<want.x?-U*5:U*5); g.ty=clamp(want.y+U*5, f.y0-U*2, f.y1+U*4); }
+      var dx=g.tx-g.x, dy=g.ty-g.y, dd=Math.sqrt(dx*dx+dy*dy);
+      var sp=(want? U*36 : U*17)*(g.st==='done'?0.6:1);
+      if(dd>U*1.5){
+        g.x+=dx/dd*Math.min(dd,sp*dt); g.y+=dy/dd*Math.min(dd,sp*dt);
+        if(Math.abs(dx)>U*1.5) g.dir = dx<0? -1 : 1;
+        g.moving=true;
+      } else { g.moving=false; if(!want){ g.wait-=dt; if(g.wait<=0) pickTarget(g); } }
+      if(want && dist2(g.x,g.y-U*4,want.x,want.y) < (U*9)*(U*9)){
+        want.gone=true; want.goat=null; if(s.drag===want) s.drag=null;
+        g.st='eat'; g.eatT=1.3; g.moving=false; g.dir = want.x<g.x? -1 : 1;
+        Audio2.sfx.candy();
+        burst(want.x, want.y, 10, want.kind==='apple'?'#ff6b6b':'#b6e26a', {up:90});
+      }
+    }
+    updFlying(dt); updateParts(dt);
+  }
+  /* PEAK: wait by the rock -> leap up -> pick -> leap down -> bring it over */
+  function updClimb(g,dt,r,f){
+    var topY = r.y - r.h + U*2;
+    if(g.st==='leap'){
+      g.leap+=dt/0.8; var k=Math.min(1,g.leap);
+      g.x=lerp(g.sx, r.x, k); g.y=lerp(g.sy, topY, k); g.hop=-Math.sin(k*Math.PI)*U*18; g.hopV=0; g.moving=false;
+      if(k>=1){ g.st='pick'; g.eatT=0.9; }
+    } else if(g.st==='pick'){
+      g.eatT-=dt;
+      if(g.eatT<=0){ g.flower=s.rockFlower; s.rockFlower=null; g.st='down'; g.leap=0; g.sx=g.x; g.sy=g.y; g.dir=-1;
+        burst(r.x, topY-U*8, 8, '#fff3b0', {kind:'star', up:90}); Audio2.sfx.pickup(2); }
+    } else if(g.st==='down'){
+      g.leap+=dt/0.7; var k2=Math.min(1,g.leap);
+      g.x=lerp(g.sx, r.x-r.w*0.9, k2); g.y=lerp(g.sy, r.y+U*4, k2); g.hop=-Math.sin(k2*Math.PI)*U*12; g.hopV=0;
+      if(k2>=1){ g.st='bring'; g.tx=W*0.26; g.ty=f.y0+U*2; }
+    } else if(g.st==='bring'){
+      var dx=g.tx-g.x, dy=g.ty-g.y, dd=Math.sqrt(dx*dx+dy*dy);
+      if(dd>U*1.5){ g.x+=dx/dd*Math.min(dd,U*30*dt); g.y+=dy/dd*Math.min(dd,U*30*dt); g.moving=true; g.dir=-1; }
+      else { g.moving=false; g.st='done'; returnFlower(g, g.flower); g.flower=null; Audio2.sfx.bloom(); pickTarget(g); }
+    } else if(g.st==='done'){
+      var dx2=g.tx-g.x, dy2=g.ty-g.y, dd2=Math.sqrt(dx2*dx2+dy2*dy2);
+      if(dd2>U*1.5){ g.x+=dx2/dd2*Math.min(dd2,U*11*dt); g.y+=dy2/dd2*Math.min(dd2,U*11*dt); g.moving=true; if(Math.abs(dx2)>U*1.5) g.dir=dx2<0?-1:1; }
+      else { g.moving=false; g.wait-=dt; if(g.wait<=0) pickTarget(g); }
+    } else { g.moving=false; }   /* waiting proudly by the rock */
+  }
+  function finishEat(g){
+    g.st = g.flower? 'done' : 'run';
+    pickTarget(g);
+    if(!g.flower) return;
+    var col=g.flower; g.flower=null;
+    returnFlower(g, col);
+  }
+  function returnFlower(g, col){
+    var to=slot(s.got.length);
+    s.flying.push({ col:col, x0:g.x-g.dir*U*12, y0:g.y-U*8, x1:to.x, y1:to.y, t:0 });
+    s.got.push(col); G.bouquet.push(col);
+    Audio2.sfx.pickup(s.got.length-1); addStars(3);
+    Voice.say(['n'+s.got.length, 'c_'+col.name]);
+    popText(''+s.got.length, g.x, g.y-U*20, '#ff6fae');
+    burst(g.x, g.y-U*8, 8, '#fff3b0', {kind:'star', up:110});
+    s.idle=0;
+    if(s.got.length>=3){
+      s.done=true; s.doneT=0;
+      setTimeout(function(){ Audio2.sfx.happy(); Voice.say('goats_done'); }, 900);
+      for(var k=0;k<26;k++){
+        spawnPart({x:rnd(0,W), y:rnd(-H*0.2,0), vx:rnd(-40,40), vy:rnd(60,180), g:120,
+          life:rnd(1.6,2.6), r:rnd(U*0.9,U*1.9), col:pick(FLOWER_COLORS).hex,
+          kind:'petal', spin:rnd(0,TAU), vs:rnd(-4,4)});
+      }
+    }
+  }
+  function updFlying(dt){
+    for(var i=s.flying.length-1;i>=0;i--){ var fl=s.flying[i]; fl.t+=dt*1.5; if(fl.t>=1) s.flying.splice(i,1); }
+  }
+
+  function drawRock(r,t){
+    ctx.fillStyle='rgba(0,0,0,0.14)';
+    ctx.beginPath(); ctx.ellipse(r.x, r.y+U*1.5, r.w*0.62, U*2.4, 0,0,TAU); ctx.fill();
+    var g=ctx.createLinearGradient(r.x-r.w/2, r.y-r.h, r.x+r.w/2, r.y);
+    g.addColorStop(0,'#d8d3cc'); g.addColorStop(0.5,'#b9b2a8'); g.addColorStop(1,'#8f877c');
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(r.x-r.w*0.55, r.y);
+    ctx.quadraticCurveTo(r.x-r.w*0.62, r.y-r.h*0.55, r.x-r.w*0.30, r.y-r.h*0.92);
+    ctx.quadraticCurveTo(r.x, r.y-r.h*1.08, r.x+r.w*0.34, r.y-r.h*0.90);
+    ctx.quadraticCurveTo(r.x+r.w*0.62, r.y-r.h*0.5, r.x+r.w*0.55, r.y);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.ellipse(r.x-r.w*0.12, r.y-r.h*0.72, r.w*0.16, r.h*0.10, -0.4, 0,TAU); ctx.fill();
+    fillCircle(r.x+r.w*0.30, r.y-r.h*0.35, U*2.2, '#6ccc5e');   /* a tuft of grass */
+    fillCircle(r.x-r.w*0.42, r.y-r.h*0.15, U*1.8, '#7ad86b');
+    if(s.rockFlower){
+      var sway=Math.sin(t*1.6)*0.12;
+      ctx.strokeStyle='#4fae4a'; ctx.lineWidth=U*0.9; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(r.x, r.y-r.h*0.95); ctx.quadraticCurveTo(r.x+sway*U*6, r.y-r.h-U*4, r.x+sway*U*10, r.y-r.h-U*8); ctx.stroke();
+      drawFlower(r.x+sway*U*10, r.y-r.h-U*8, U*3.6, s.rockFlower, Math.sin(t*0.8)*0.15, false, 0);
+      if(Math.random()<0.03) spawnPart({x:r.x+rnd(-U*4,U*4), y:r.y-r.h-U*8, vx:rnd(-15,15), vy:rnd(-40,-15), g:-10, life:0.9, r:U*0.6, col:'#fff3b0', kind:'star', spin:rnd(0,TAU), vs:3});
+    }
+  }
+
+  function drawMountains(t){
+    /* three soft ridges, the nearest darkest, and one tall snowy peak */
+    var hz=H*0.36, layers=[
+      {col:'#c3cdf0', top:0.16, amp:0.05, k:1.7, ph:0.4},
+      {col:'#a3b2e6', top:0.21, amp:0.045, k:2.6, ph:2.1},
+      {col:'#8598d6', top:0.27, amp:0.035, k:3.4, ph:4.0}
+    ];
+    for(var L=0; L<layers.length; L++){ var ly=layers[L];
+      ctx.fillStyle=ly.col; ctx.beginPath(); ctx.moveTo(0,hz);
+      for(var x=0; x<=W; x+=U*3){ var yy=H*ly.top + Math.sin(x/W*Math.PI*ly.k+ly.ph)*H*ly.amp + Math.sin(x/W*Math.PI*ly.k*2.3+ly.ph)*H*ly.amp*0.35; ctx.lineTo(x,yy); }
+      ctx.lineTo(W,hz); ctx.closePath(); ctx.fill(); }
+    var px=W*0.62, pt=H*0.10;
+    ctx.fillStyle='#93a4dd';
+    ctx.beginPath(); ctx.moveTo(px-W*0.20,H*0.28); ctx.lineTo(px,pt); ctx.lineTo(px+W*0.20,H*0.28); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.moveTo(px,pt); ctx.lineTo(px+W*0.075,pt+H*0.065); ctx.lineTo(px+W*0.04,pt+H*0.055); ctx.lineTo(px+W*0.01,pt+H*0.075);
+    ctx.lineTo(px-W*0.03,pt+H*0.05); ctx.lineTo(px-W*0.075,pt+H*0.065); ctx.closePath(); ctx.fill();
+    /* haze where the hills meet the meadow */
+    var g=ctx.createLinearGradient(0,H*0.30,0,hz); g.addColorStop(0,'rgba(223,245,255,0)'); g.addColorStop(1,'rgba(223,245,255,0.7)');
+    ctx.fillStyle=g; ctx.fillRect(0,H*0.30,W,hz-H*0.30);
+  }
+  function drawStream(t){
+    /* a wide, slow stream down the left edge, with stepping stones and reeds */
+    ctx.fillStyle='#7ec8f5';
+    ctx.beginPath();
+    ctx.moveTo(-U*2, H*0.37); ctx.quadraticCurveTo(W*0.02, H*0.52, -U*1, H*0.70); ctx.quadraticCurveTo(-U*3, H*0.85, W*0.02, H+U*2);
+    ctx.lineTo(W*0.14, H+U*2); ctx.quadraticCurveTo(W*0.09, H*0.84, W*0.115, H*0.70); ctx.quadraticCurveTo(W*0.13, H*0.52, W*0.075, H*0.37);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#a9dcff'; ctx.lineWidth=U*0.9; ctx.lineCap='round';
+    for(var i=0;i<7;i++){ var k=((t*0.12)+i*0.14)%1, yy=H*(0.40+k*0.58), xx=W*(0.03+0.045*Math.sin(k*9+i)) + W*0.02;
+      ctx.save(); ctx.globalAlpha=0.9*Math.sin(k*Math.PI); ctx.beginPath(); ctx.moveTo(xx,yy); ctx.lineTo(xx+U*3.5,yy-U*0.6); ctx.stroke(); ctx.restore(); }
+    var stones=[[0.045,0.50],[0.075,0.58],[0.04,0.66],[0.07,0.76],[0.05,0.88]];
+    for(var st=0; st<stones.length; st++){ var sx=W*stones[st][0], sy=H*stones[st][1];
+      fillCircle(sx, sy+U*0.6, U*2.6, 'rgba(60,110,150,0.35)'); fillCircle(sx, sy, U*2.4, '#cfc9c0'); fillCircle(sx-U*0.7, sy-U*0.7, U*0.9, 'rgba(255,255,255,0.55)'); }
+    ctx.strokeStyle='#4fae4a'; ctx.lineWidth=U*0.7;
+    for(var r=0;r<5;r++){ var rx=W*0.125+r*U*1.4, ry=H*(0.44+r*0.02), sw=Math.sin(t*1.5+r)*U*0.8;
+      ctx.beginPath(); ctx.moveTo(rx,ry+U*6); ctx.quadraticCurveTo(rx+sw, ry+U*2, rx+sw*1.6, ry-U*4); ctx.stroke(); }
+  }
+  function draw(t){
+    drawSky(t, '#dff5ff');
+    drawMountains(t);
+    drawGrassGround(H*0.36);
+    drawStream(t);
+    /* fence across the back */
+    var fy=H*0.36, i, fr;
+    for(var x=-U*2; x<W+U*6; x+=U*7){
+      ctx.fillStyle='#fff6fb'; rr(x, fy-U*9, U*3.4, U*11, U*1.0); ctx.fill();
+      ctx.fillStyle='#ffe3f0'; rr(x, fy-U*9, U*3.4, U*1.6, U*0.8); ctx.fill();
+    }
+    ctx.fillStyle='#fff6fb'; ctx.fillRect(0, fy-U*6.5, W, U*1.6); ctx.fillRect(0, fy-U*2.8, W, U*1.6);
+    fillCircle(W*0.95, H*0.88, U*4.6, '#6ccc5e'); fillCircle(W*1.0, H*0.89, U*3.5, '#7ad86b');
+    var r=rock();
+    drawRock(r,t);
+    /* Lily, hands up when she is holding fruit out */
+    drawGirl(W*0.12, H*0.29, U*4.6, {t:t, bob:true, armUp:!!s.drag});
+    for(i=0;i<s.fruits.length;i++){ fr=s.fruits[i]; if(fr.gone||fr.held) continue;
+      ctx.save(); ctx.globalAlpha=0.2; ctx.fillStyle='#000';
+      ctx.beginPath(); ctx.ellipse(fr.x, fr.y+U*4.5, U*4, U*1.1, 0,0,TAU); ctx.fill(); ctx.restore();
+      drawFruit(fr.x, fr.y+(fr.onGrass?0:Math.sin(t*2.4+fr.ph)*U*0.8), U*4.2, fr.kind, fr.onGrass?0.3:Math.sin(t+fr.ph)*0.15); }
+    var order=s.goats.slice().sort(function(a,b){ return (a.y+(a.hop||0)*0)-(b.y+(b.hop||0)*0); });
+    for(i=0;i<order.length;i++){ var gd=order[i]; drawGoat(gd.x, gd.y, U*6.2, gd, t);
+      if(gd.kind==='pet' && gd.pet>0 && gd.flower){            /* petting meter: hearts filling */
+        var pw=U*12, ph=U*1.6; ctx.fillStyle='rgba(255,255,255,0.7)'; rr(gd.x-pw/2, gd.y-U*19, pw, ph, ph/2); ctx.fill();
+        ctx.fillStyle='#ff6fae'; rr(gd.x-pw/2, gd.y-U*19, pw*clamp(gd.pet/PET_NEED,0,1), ph, ph/2); ctx.fill(); } }
+    if(s.drag) drawFruit(s.drag.x, s.drag.y, U*5.0, s.drag.kind, Math.sin(t*3)*0.1);
+    for(i=0;i<s.flying.length;i++){ var fl=s.flying[i], k=fl.t, e=1-Math.pow(1-k,2);
+      drawFlower(lerp(fl.x0,fl.x1,e), lerp(fl.y0,fl.y1,e)-Math.sin(k*Math.PI)*U*14, U*4.5*(1-0.5*k), fl.col, k*4, false, 0); }
+    drawParts();
+    /* the basket: three slots that fill as the flowers come back */
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.82)'; rr(U*4,U*5,U*26,U*11,U*4.6); ctx.fill();
+    ctx.fillStyle='#c98a4b'; rr(U*5.6, U*5+U*11*0.34, U*8, U*11*0.52, U*1.2); ctx.fill();
+    ctx.strokeStyle='#a86f38'; ctx.lineWidth=U*0.5; ctx.beginPath(); ctx.arc(U*9.6, U*5+U*11*0.36, U*3.0, Math.PI, TAU); ctx.stroke();
+    for(i=0;i<3;i++){ var sl=slot(i);
+      if(i<s.got.length) drawFlower(sl.x, sl.y, U*1.7, s.got[i], 0, false, 0);
+      else { ctx.strokeStyle='rgba(120,90,120,0.35)'; ctx.lineWidth=U*0.35; circle(sl.x, sl.y, U*1.5); ctx.stroke(); } }
+    ctx.restore();
+    /* nudges, after a moment of nothing happening */
+    var nh=nextHint();
+    if(nh && !s.drag && !s.done && s.idle>2.5){
+      var a=0.35+0.35*Math.sin(t*4);
+      ctx.save(); ctx.globalAlpha=a; ctx.strokeStyle='#fff'; ctx.lineWidth=U*1.2;
+      if(nh.kind==='feed'){
+        var f0=null; for(i=0;i<s.fruits.length;i++){ if(!s.fruits[i].gone && !s.fruits[i].onGrass){ f0=s.fruits[i]; break; } }
+        var anyOnGrass=s.fruits.some(function(q){ return q.onGrass&&!q.gone; });
+        if(f0 && !anyOnGrass && nh.x<W){ ctx.setLineDash([U*2.2,U*2.2]);
+          ctx.beginPath(); ctx.moveTo(f0.x, f0.y-U*7); ctx.quadraticCurveTo((f0.x+nh.x)/2, (f0.y+nh.y)/2-U*12, nh.x, nh.y+U*2); ctx.stroke(); ctx.setLineDash([]); }
+      } else if(nh.kind==='pet'){
+        /* a hand-sized circle rubbing back and forth over her back */
+        var hx=nh.x+Math.sin(t*5)*U*5, hy=nh.y-U*7;
+        circle(hx,hy,U*5.5); ctx.stroke(); fillCircle(hx,hy,U*3,'rgba(255,255,255,0.7)');
+      } else {
+        circle(nh.x, nh.y-U*6, U*8+Math.sin(t*4)*U*1.2); ctx.stroke(); fillCircle(nh.x, nh.y-U*6, U*3, 'rgba(255,255,255,0.7)');
+      }
+      ctx.restore();
+    }
+  }
+  return { enter:enter, update:update, draw:draw, onResize:onResize, dbg:function(){ return s; } };
+})();
+
+/* ================================ NAP TIME ================================ */
+/* The game closes itself after PLAY_MINUTES of play: everyone dances, says
+   goodbye, and goes to sleep, and the page stays asleep for NAP_MINUTES even
+   if it is reopened. A grown-up can wake it by holding the moon for 4 seconds. */
+var Nap = (function(){
+  var s=null, stars=[];
+  for(var i=0;i<40;i++) stars.push({x:Math.random(), y:Math.random()*0.5, r:rnd(0.5,1.4), ph:rnd(0,TAU)});
+  function moon(){ return { x:W*0.80, y:H*0.14, r:U*7.5 }; }
+  function enter(data){
+    s={ t:0, sleep:!!(data&&data.sleep), hold:0, byeI:0, byeAt:[3.8,5.8,7.8], said2:false,
+        byes: PEOPLE.map(function(p){ return p.id; }).sort(function(){ return Math.random()-0.5; }).slice(0,3) };
+    if(!napActive()){ G.napUntil = Date.now()+NAP_MINUTES*60000; LS.set('nina_nap_until', String(G.napUntil)); }
+    G.playT=0; LS.set('nina_playT','0');
+    if(s.sleep){ Audio2.stopMusic(); Voice.stop(); }
+    else Voice.say('nap');
+  }
+  function wake(){
+    G.napUntil=0; LS.set('nina_nap_until','0'); G.playT=0;
+    Audio2.resume(); Audio2.startMusic(); Audio2.sfx.star();
+    Scene.go('title');
+  }
+  function update(dt,t){
+    s.t+=dt; updateParts(dt);
+    if(!s.sleep){
+      if(s.byeI<3 && s.t>s.byeAt[s.byeI]){ Voice.say('bye_'+s.byes[s.byeI]); s.byeI++; }
+      if(!s.said2 && s.t>10.2){ s.said2=true; Voice.say('nap2'); }
+      if(s.t<10 && Math.random()<dt*3){
+        spawnPart({x:rnd(0,W), y:rnd(0,H*0.5), vx:0, vy:rnd(-10,10), g:0, life:rnd(0.8,1.6), r:rnd(U*0.5,U*1.2),
+          col:'#fff3b0', kind:'star', spin:rnd(0,TAU), vs:3});
+      }
+      if(s.t>14.5){ s.sleep=true; s.t=0; Audio2.stopMusic(); Voice.stop(); }
+    } else {
+      var m=moon();
+      if(P.down && dist2(P.x,P.y,m.x,m.y) < (m.r*1.8)*(m.r*1.8)){ s.hold+=dt; if(s.hold>=4){ s.hold=0; wake(); } }
+      else s.hold=0;
+    }
+  }
+  function draw(t){
+    var k = s.sleep? 1 : clamp(s.t/12, 0, 0.75);   /* evening deepens into night */
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0, s.sleep? '#141538' : '#3b2f7a'); g.addColorStop(0.55, s.sleep? '#2a2560' : '#7a55b0'); g.addColorStop(1, s.sleep? '#3a3170' : '#ffb0c8');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(var i=0;i<stars.length;i++){ var st=stars[i];
+      ctx.save(); ctx.globalAlpha=(0.35+0.65*k)*(0.6+0.4*Math.sin(t*2+st.ph)); fillCircle(st.x*W, st.y*H, U*st.r, '#fff'); ctx.restore(); }
+    var m=moon();
+    ctx.save(); ctx.globalAlpha=0.35; fillCircle(m.x,m.y,m.r*1.5,'#fff2b0'); ctx.restore();
+    fillCircle(m.x,m.y,m.r,'#fff2b0');
+    ctx.strokeStyle=C.ink; ctx.lineWidth=m.r*0.09; ctx.lineCap='round';
+    if(s.sleep){ /* closed, smiling */
+      ctx.beginPath(); ctx.arc(m.x-m.r*0.32, m.y-m.r*0.10, m.r*0.16, 0.2, Math.PI-0.2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(m.x+m.r*0.32, m.y-m.r*0.10, m.r*0.16, 0.2, Math.PI-0.2); ctx.stroke();
+    } else {
+      fillCircle(m.x-m.r*0.32, m.y-m.r*0.12, m.r*0.10, C.ink); fillCircle(m.x+m.r*0.32, m.y-m.r*0.12, m.r*0.10, C.ink);
+    }
+    ctx.beginPath(); ctx.arc(m.x, m.y+m.r*0.18, m.r*0.28, 0.3, Math.PI-0.3); ctx.stroke();
+    if(s.hold>0){ ctx.save(); ctx.globalAlpha=0.6; ctx.strokeStyle='#fff'; ctx.lineWidth=U*0.8;
+      ctx.beginPath(); ctx.arc(m.x,m.y,m.r*1.3,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,s.hold/4)); ctx.stroke(); ctx.restore(); }
+    /* the ground, in evening light */
+    drawGrassGround(H*0.62);
+    ctx.fillStyle='rgba(20,20,70,'+(0.25+0.35*k)+')'; ctx.fillRect(0,H*0.62,W,H*0.38);
+
+    if(!s.sleep){
+      /* everyone dances: two rows, arms swapping on the beat */
+      var ps=Math.min(W,H)*0.058, wide=W>H*1.15;
+      for(var p=0;p<PEOPLE.length;p++){
+        var row = wide? 0 : (p<4?0:1), col = wide? p : (p<4? p : p-4), n = wide? 7 : (row===0?4:3);
+        var px = W*(0.5+(col-(n-1)/2)*(wide?0.13:0.22)), py = H*(wide?0.60:(row===0?0.60:0.74));
+        var beat = Math.floor(t*2+p*0.5)%2===0;
+        var jump = Math.abs(Math.sin(t*4+p))*U*2.5;
+        ctx.save(); ctx.translate(px, py-jump); ctx.rotate(Math.sin(t*4+p)*0.06);
+        drawPerson(0,0,ps,PEOPLE[p],t,beat); ctx.restore();
+      }
+      var lb=Math.floor(t*2)%2===0;
+      drawGirl(W*0.22, H*0.90-Math.abs(Math.sin(t*4))*U*3, U*5.4, {t:t, bob:true, armUp:lb});
+      ctx.save(); ctx.translate(W*0.78, H*0.92); ctx.rotate(Math.sin(t*4)*0.08); ctx.scale(0.75,0.75); drawCar(0,0,U*17,t,0); ctx.restore();
+      drawParts();
+      if(s.t>0.4){
+        var pop=Math.min(1,(s.t-0.4)/0.35);
+        bigText('NAP TIME!', W/2, H*0.30, U*10*pop, '#ffffff', '#8f5fe0');
+        bigText('Bye bye, Nina!', W/2, H*0.30+U*9, U*5.2*pop, '#ffe066', '#8f5fe0');
+      }
+    } else {
+      /* asleep: everyone tucked along the grass, z's drifting up */
+      ctx.save(); ctx.globalAlpha=0.6;
+      var ps2=Math.min(W,H)*0.05, wide2=W>H*1.15;
+      for(var q=0;q<PEOPLE.length;q++){
+        var row2 = wide2? 0 : (q<4?0:1), col2 = wide2? q : (q<4? q : q-4), n2 = wide2? 7 : (row2===0?4:3);
+        drawPerson(W*(0.5+(col2-(n2-1)/2)*(wide2?0.13:0.22)), H*(wide2?0.66:(row2===0?0.66:0.78)), ps2, PEOPLE[q], 0, false, true);
+      }
+      drawGirl(W*0.5, H*0.90, U*4.4, {t:0, bob:false, armUp:false, asleep:true});
+      ctx.restore();
+      for(var z=0;z<3;z++){ var zt=(t*0.5+z*0.33)%1;
+        ctx.save(); ctx.globalAlpha=1-zt; bigText('z', W*0.5+U*8+zt*U*10, H*0.86-zt*U*22, U*(4+zt*6), '#ffffff', '#8f5fe0'); ctx.restore(); }
+      bigText('NAP TIME', W/2, H*0.32, U*10, '#ffffff', '#8f5fe0');
+      bigText('See you after your nap!', W/2, H*0.32+U*9, U*4.4, '#e6ddff', '#5a3f9a');
+    }
+  }
+  return { enter:enter, update:update, draw:draw, onResize:function(){} };
+})();
+
 /* =============================== STICKERS ================================= */
-var STICKERS = ['flower','can','heart','star','rainbow','butterfly','car','gem'];
+var STICKERS = ['flower','can','heart','star','rainbow','butterfly','car','gem','goat','apple'];
 function drawSticker(kind,x,y,r,t){
   ctx.save(); ctx.translate(x,y);
   fillCircle(0,0,r,'#ffffff');
@@ -1926,6 +2620,8 @@ function drawSticker(kind,x,y,r,t){
   else if(kind==='star') drawStar(0,0,r*0.75,'#ffd93d',t*0.3);
   else if(kind==='car'){ ctx.save(); ctx.scale(0.62,0.62); drawCar(0,0,r*1.6,t,0); ctx.restore(); }
   else if(kind==='gem') drawGem(0,0,r*0.65,290,t*0.3);
+  else if(kind==='goat') drawGoat(r*0.1, r*0.05, r*0.30, {dir:-1, kind:'climb', st:'done', moving:false, hop:0, t:0}, t);
+  else if(kind==='apple') drawFruit(0, r*0.05, r*0.48, 'apple', 0);
   else if(kind==='butterfly'){
     drawButterfly(0, 0, r*0.42, '#b98bff', Math.abs(Math.sin(t*6)));
   } else { /* rainbow */
@@ -1942,17 +2638,22 @@ function drawSticker(kind,x,y,r,t){
 /* The between-rounds reward. Auto-advances -- a 3-year-old should never be
    stuck on a screen waiting to find a button. */
 var Cheer = (function(){
-  var s=null;
+  var s=null, s_newSticker=false;
   var LINES = {
     drive:    'You filled the basket!',
     garden:   'The flowers bloomed!',
     deliver:  'They loved your flowers!',
-    letters:  'You spelled a word!'
+    letters:  'You spelled a word!',
+    goats:    'The goats gave them back!'
   };
   var GARDEN_LINES = ['', 'Little sprouts came up!', 'Your plants got bigger!', 'The flowers bloomed!'];
   function enter(data){
     var kind = (data&&data.kind)||'drive';
-    var sticker = pick(STICKERS);
+    /* hand out the stickers she is missing first, so the album on the title
+       screen fills up round by round instead of repeating */
+    var missing = STICKERS.filter(function(k){ return G.stickers.indexOf(k)<0; });
+    var sticker = missing.length? pick(missing) : pick(STICKERS);
+    s_newSticker = missing.length>0;
     G.stickers.push(sticker);
     if(G.stickers.length>40) G.stickers = G.stickers.slice(-40);
     saveProgress();
@@ -2005,6 +2706,9 @@ var Cheer = (function(){
     drawParts();
     /* stars earned */
     drawStarCount();
+    if(s_newSticker && s.t>0.5){
+      bigText('NEW STICKER!', W/2, H*0.40 + r*1.35, U*4.6, '#ffe066', '#e0498d');
+    }
     if(s.t>1.4){
       var a2 = 0.4+0.4*Math.sin(t*4);
       ctx.save(); ctx.globalAlpha=a2;
@@ -2075,6 +2779,21 @@ var Title = (function(){
     ctx.restore();
     bigText('TAP TO PLAY', W/2, H*0.855+U*6.5, U*6.4, '#ff5fa3');
 
+    /* sticker album: one slot per kind, filled as she earns them */
+    var have = {}; for(var sk=0; sk<G.stickers.length; sk++) have[G.stickers[sk]] = true;
+    var slotR = Math.min(U*4.2, (W-U*8)/(STICKERS.length*2.3));
+    var sx0 = W/2 - (STICKERS.length-1)*slotR*2.3/2, syy = H*0.49;
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.55)';
+    rr(sx0-slotR*1.5, syy-slotR*1.35, (STICKERS.length-1)*slotR*2.3+slotR*3, slotR*2.7, slotR*1.35); ctx.fill();
+    for(var si=0; si<STICKERS.length; si++){
+      var sxx = sx0 + si*slotR*2.3;
+      if(have[STICKERS[si]]) drawSticker(STICKERS[si], sxx, syy, slotR, t);
+      else { ctx.strokeStyle='rgba(224,73,141,0.35)'; ctx.lineWidth=slotR*0.12;
+             ctx.setLineDash([slotR*0.3, slotR*0.3]); circle(sxx,syy,slotR*0.9); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    ctx.restore();
+
     if(G.best>0){
       drawStar(W*0.5-U*10, H*0.955, U*3.2, '#ffd93d', t*0.4);
       bigText('' + G.best, W*0.5+U*2, H*0.955, U*6, '#ffffff', '#ff9dc7');
@@ -2089,7 +2808,7 @@ var Title = (function(){
 <script>
 "use strict";
 /* ============================ scene manager =============================== */
-var SCENES = { title:Title, drive:Drive, garden:Garden, deliver:Deliver, letters:Letters, cheer:Cheer };
+var SCENES = { title:Title, drive:Drive, garden:Garden, deliver:Deliver, letters:Letters, goats:Goats, nap:Nap, cheer:Cheer };
 
 var Scene = {
   cur: 'title',
@@ -2105,6 +2824,8 @@ var Scene = {
     if(this.pending) return false;
     G.roundIndex++;
     saveProgress();
+    /* the budget is checked between rounds, so a round is never cut off mid-task */
+    if(G.playT >= PLAY_MINUTES*60) return this.go('nap');
     return this.go(CYCLE[G.roundIndex % CYCLE.length]);
   },
   onResize: function(){
@@ -2194,7 +2915,7 @@ function frame(ts){
 
   try{
     /* the sound button is checked before the scene sees the tap */
-    if(P.justDown){
+    if(P.justDown && Scene.cur!=='nap'){
       var b = soundBtn();
       if(dist2(P.x,P.y,b.x,b.y) < (b.r*1.35)*(b.r*1.35)){
         Audio2.setMuted(!Audio2.isMuted());
@@ -2204,12 +2925,18 @@ function frame(ts){
       }
     }
 
+    if(Scene.cur!=='title' && Scene.cur!=='nap'){
+      G.playT += dt; G.saveT += dt;
+      if(G.saveT > 4){ G.saveT = 0; LS.set('nina_playT', String(Math.round(G.playT))); LS.set('nina_lastPlay', String(Date.now())); }
+      /* a round that drags on well past the budget ends anyway */
+      if(G.playT > PLAY_MINUTES*60 + 150 && Scene.cur!=='cheer') Scene.go('nap');
+    }
     Scene.update(dt, gameT);
     ctx.setTransform(DPR,0,0,DPR,0,0);
     ctx.clearRect(0,0,W,H);
     Scene.draw(gameT);
-    drawSoundBtn();
-    if(Scene.cur!=='cheer' && Scene.cur!=='title') drawStarCount();
+    if(Scene.cur!=='nap') drawSoundBtn();
+    if(Scene.cur!=='cheer' && Scene.cur!=='title' && Scene.cur!=='nap') drawStarCount();
   }catch(err){
     /* never let one bad frame kill the loop */
     if(!window.__reported){
@@ -2224,7 +2951,8 @@ function frame(ts){
 
 /* ---- boot ---- */
 resize();
-SCENES[Scene.cur].enter();
+if(napActive()) Scene.cur='nap';           /* reopened during the nap: stay asleep */
+SCENES[Scene.cur].enter(Scene.cur==='nap'? {sleep:true} : undefined);
 requestAnimationFrame(frame);
 
 /* rAF is suspended in Low Power Mode and some webviews -- take over on a timer.

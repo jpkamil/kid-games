@@ -14,9 +14,10 @@ Setup (once):
     ./setup_voice.sh          # venv + models under ~/.local/share/nina-tts
 
 Then:
-    python3 build_voice.py && ./build.sh
+    python3 build_voice.py && ./build.sh      # renders only lines not yet in voice_clips.js
+    python3 build_voice.py --all              # re-render everything (changes every clip)
 """
-import base64, json, os, shutil, subprocess, sys, wave
+import base64, io, json, os, shutil, subprocess, sys, wave
 
 TTS   = os.path.expanduser("~/.local/share/nina-tts")
 PY_   = os.path.join(TTS, "venv/bin/python")
@@ -48,7 +49,7 @@ THANKS = {
   'oliver':'Thank you Nina! I love flowers.',
   'mia':'Thank you Nina! You are the best.',
 }
-WORDS  = ['NINA','CAT','DOG','MOM','DAD','SUN','THEO','BUS','OLIVER']
+WORDS  = ['NINA','CAT','DOG','MOM','DAD','SUN','CAR','THEO','BUS','BEE','PIG','OLIVER','HAT']
 COLORS = ['pink','yellow','purple','red','blue','orange','white']
 NUMS   = ['One!','Two!','Three!','Four!','Five!','Six!']
 
@@ -75,11 +76,42 @@ for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
     add('L_'+ch, ch+".", slow=1.30)
 for i,l in enumerate(["Great job!","Wonderful!","You did it!","Yay Nina!"]):
     add('yay%d'%i, l)
+# the goats round
+add('goats2',     "Oh no! Naughty goats took the flowers!")
+add('g_feed',     "Munchy is hungry. Give her an apple or a pear!")
+add('g_pet',      "Fluffy wants a cuddle. Pet her softly with your finger.")
+add('g_climb',    "Peak is a mountain goat! Tap her, and she will climb the rock and pick the flower for you.")
+add('f_apple',    "An apple!")
+add('f_pear',     "A pear!")
+add('goats_done', "You got all the flowers back! Good job, Nina!")
+# nap time: everyone says goodbye in their own voice, then the game sleeps
+add('nap',  "Farewell Nina! It's our nap time now. Bye bye!")
+add('nap2', "Night night, Nina. See you after nap time!")
+BYES = {
+  'mom':'Bye bye Nina! I love you!', 'dad':'Bye Nina! See you soon!', 'grandma':'Goodbye sweetheart. Sleep well.',
+  'teacher':'Bye Nina! Have a lovely nap.', 'theo':'Bye Nina!', 'oliver':'See you later, Nina!',
+  'mia':'Bye Nina! Night night!',
+}
+for k,v in BYES.items(): add('bye_'+k, v, who=k)
+
+# ---- incremental: keep clips already shipped, render only the new lines ----
+# Piper samples its noise, so re-rendering an existing line changes how it
+# sounds.  Lines Jeremy has already heard and approved stay byte-identical
+# unless --all is passed.
+keep = {}
+if '--all' not in sys.argv and os.path.exists(OUT):
+    import re
+    m = re.search(r'var VOICE_CLIPS = (\{.*\});', io.open(OUT, encoding='utf-8').read(), re.S)
+    if m:
+        old = json.loads(m.group(1))
+        keep = {k:v for k,v in old.items() if k in clips}
+todo = {k:v for k,v in clips.items() if k not in keep}
+print("existing clips kept: %d   new lines to render: %d" % (len(keep), len(todo)))
 
 # ---- synthesise, grouped by model so each one loads exactly once ----
 shutil.rmtree(TMP, ignore_errors=True); os.makedirs(TMP)
 jobs = {}
-for cid,(text,model,pitch,length) in clips.items():
+for cid,(text,model,pitch,length) in todo.items():
     jobs.setdefault(model, []).append({'id':cid, 'text':text, 'length':length})
 
 worker = os.path.join(TMP, "_synth.py")
@@ -112,14 +144,15 @@ def chain(p):
         "aresample=22050,asetrate=%d,aresample=22050,atempo=%.4f," % (int(22050*p), 1.0/p)
     return pitch + TRIM + "," + POST
 
-out, total = {}, 0
-for cid,(text,model,pitch,length) in clips.items():
+out, total = dict(keep), 0
+for cid,(text,model,pitch,length) in todo.items():
     wav = os.path.join(TMP, cid+'.wav'); m4a = os.path.join(TMP, cid+'.m4a')
     subprocess.run(['ffmpeg','-y','-loglevel','error','-i',wav,'-af',chain(pitch),
                     '-ar','22050','-ac','1','-c:a','aac','-b:a','32k', m4a], check=True)
     raw = open(m4a,'rb').read(); total += len(raw)
     out[cid] = base64.b64encode(raw).decode('ascii')
 
+out = {k: out[k] for k in clips if k in out}
 with open(OUT,'w') as f:
     f.write("/* Spoken lines rendered offline with Piper neural TTS (see build_voice.py).\n"
             "   Baked in so every device says it the same way, with no network. */\n")
