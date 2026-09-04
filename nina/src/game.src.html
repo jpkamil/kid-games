@@ -668,7 +668,7 @@ function drawPerson(x,y,size,kind,t,happy,asleep){
   var footY   = bodyTop + size*2.50;
   /* the children are smaller than the grown-ups and Daddy is the tallest --
      scaled about the soles so everyone still stands on the same grass line */
-  var sc = kind.kid? 0.78 : (kind.tall? 1.08 : 1);
+  var sc = kind.kid? 0.78 : (kind.tall? (kind.tall===true? 1.08 : kind.tall) : 1);
   if(sc!==1){ var sole = footY + size*0.32; ctx.translate(0, sole*(1-sc)); ctx.scale(sc,sc); }   /* same for trousers and dresses, so the
                                           delivery scene can stand anyone on the grass */
 
@@ -1019,6 +1019,9 @@ var PEOPLE = [
   {id:'grandma', label:'Grandma', hair:'#e6e6f0', hairDark:'#c4c4d8', longHair:true,
                  glasses:true, dress:'#b9a2e6', collar:'#fff6fb', belt:'#e9c8f2',
                  necklace:'#ffd873', shoe:'#8f5fe0'},
+  /* Pa, Nina's grandpa: the tallest, short silver hair, a warm sweater, not old */
+  {id:'pa',      label:'Pa',      hair:'#c9c9d4', hairDark:'#a9a9b8', short:true, tall:1.13,
+                 shirt:'#3f8f6a', pants:'#b8925e', belt:'#6b4a2a', collar:'#f4efe6', shoe:'#5a3b22'},
   {id:'dad',     label:'Daddy',   hair:'#4a3020', hairDark:'#3a2416', short:true, tall:true,
                  shirt:'#6fc9ff', pants:'#3d5f86', belt:'#2b4360', collar:'#eaf7ff',
                  shoe:'#2f4256'},
@@ -2577,7 +2580,7 @@ var Nap = (function(){
       var ps=Math.min(W,H)*0.058, wide=W>H*1.15;
       for(var p=0;p<PEOPLE.length;p++){
         var row = wide? 0 : (p<4?0:1), col = wide? p : (p<4? p : p-4), n = wide? PEOPLE.length : (row===0?4:PEOPLE.length-4);
-        var px = W*(0.5+(col-(n-1)/2)*(wide?0.115:0.22)), py = H*(wide?0.60:(row===0?0.60:0.74));
+        var px = W*(0.5+(col-(n-1)/2)*(wide?0.105:(n>4?0.185:0.22))), py = H*(wide?0.60:(row===0?0.60:0.74));
         var beat = Math.floor(t*2+p*0.5)%2===0;
         var jump = Math.abs(Math.sin(t*4+p))*U*2.5;
         ctx.save(); ctx.translate(px, py-jump); ctx.rotate(Math.sin(t*4+p)*0.06);
@@ -2598,7 +2601,7 @@ var Nap = (function(){
       var ps2=Math.min(W,H)*0.05, wide2=W>H*1.15;
       for(var q=0;q<PEOPLE.length;q++){
         var row2 = wide2? 0 : (q<4?0:1), col2 = wide2? q : (q<4? q : q-4), n2 = wide2? PEOPLE.length : (row2===0?4:PEOPLE.length-4);
-        drawPerson(W*(0.5+(col2-(n2-1)/2)*(wide2?0.115:0.22)), H*(wide2?0.66:(row2===0?0.66:0.78)), ps2, PEOPLE[q], 0, false, true);
+        drawPerson(W*(0.5+(col2-(n2-1)/2)*(wide2?0.105:(n2>4?0.185:0.22))), H*(wide2?0.66:(row2===0?0.66:0.78)), ps2, PEOPLE[q], 0, false, true);
       }
       drawGirl(W*0.5, H*0.90, U*4.4, {t:0, bob:false, armUp:false, asleep:true});
       ctx.restore();

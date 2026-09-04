@@ -34,6 +34,7 @@ CAST = {
   'mom':     ('en_US-amy-medium',          1.00, 1.06),
   'grandma': ('en_US-kristin-medium',      1.00, 1.06),
   'dad':     ('en_US-hfc_male-medium',     1.00, 1.04),   # warm, gentle, masculine
+  'pa':      ('en_US-joe-medium',          0.97, 1.08),   # grandpa: deeper, a touch slower
   'teacher': ('en_GB-jenny_dioco-medium',  1.00, 1.06),
   'charlotte': ('en_US-hfc_female-medium', 1.02, 1.02),  # Nina's big sister, 15
   'theo':    ('en_US-kathleen-low',        1.04, 0.98),
@@ -41,7 +42,7 @@ CAST = {
   'mia':     ('en_GB-alba-medium',         1.06, 1.00),
 }
 FOR_LINE = {
-  'mom':'Flowers for Mommy!', 'dad':'Flowers for Daddy!', 'grandma':'Flowers for Grandma!',
+  'mom':'Flowers for Mommy!', 'dad':'Flowers for Daddy!', 'grandma':'Flowers for Grandma!', 'pa':'Flowers for Pa!',
   'teacher':'Flowers for your teacher!', 'charlotte':'Flowers for Charlotte!', 'theo':'Flowers for Theo!',
   'oliver':'Flowers for Oliver!', 'mia':'Flowers for your friend Mia!',
 }
@@ -49,6 +50,7 @@ THANKS = {
   'mom':'Thank you Nina! I love them!',
   'dad':'Wow, thank you Nina!',
   'grandma':'Oh Nina, they are beautiful. Thank you!',
+  'pa':"Well, thank you, Nina! These are wonderful.",
   'teacher':'Thank you Nina! What lovely flowers.',
   'charlotte':"Aww, thank you Nina! You're the best little sister.",
   'theo':'Thanks Nina! These are so pretty.',
@@ -97,6 +99,7 @@ BYES = {   # everyone is off to their own nap too
   'mom':     "Bye bye, Nina! It's nap time for everyone. I love you!",
   'dad':     "Bye bye, Nina! It's my nap time too. See you soon!",
   'grandma': "Goodbye, Nina. It's nap time for me too. Sleep well, my darling.",
+  'pa':      "Bye bye, Nina. Pa is going for a nap too. See you soon, kiddo.",
   'teacher': "Bye Nina! It's our nap time too. Have a lovely nap.",
   'charlotte': "Bye Nina! I'm going for a nap too. See you later!",
   'theo':    "Bye Nina! Time for my nap!",
