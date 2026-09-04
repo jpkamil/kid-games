@@ -15,7 +15,8 @@ for v in en/en_US/amy/medium/en_US-amy-medium \
          en/en_GB/jenny_dioco/medium/en_GB-jenny_dioco-medium \
          en/en_US/hfc_male/medium/en_US-hfc_male-medium \
          en/en_US/kathleen/low/en_US-kathleen-low \
-         en/en_GB/alba/medium/en_GB-alba-medium; do
+         en/en_GB/alba/medium/en_GB-alba-medium \
+         en/en_US/libritts_r/medium/en_US-libritts_r-medium; do
   f=$(basename "$v")
   [ -f "models/$f.onnx" ] && continue
   curl -sL -o "models/$f.onnx"      "$BASE/$v.onnx"

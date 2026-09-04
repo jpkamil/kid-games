@@ -25,7 +25,8 @@ PY_   = os.path.join(TTS, "venv/bin/python")
 MODEL = os.path.join(TTS, "models")
 OUT, TMP = "voice_clips.js", "voicebuild"
 
-# voice model, pitch/formant factor applied afterwards, phoneme length (>1 = slower)
+# voice model, pitch/formant factor applied afterwards, phoneme length (>1 = slower),
+# and for multi-speaker models (arctic, libritts_r) an optional speaker id
 NARR = ('en_US-amy-medium', 1.00, 1.06)
 # Auditioned with Jeremy 2026-09-03. Pitching a man's voice up by a fifth made
 # the boys sound like chipmunks and the lowered, slowed Grandma sounded ominous;
@@ -34,7 +35,7 @@ CAST = {
   'mom':     ('en_US-amy-medium',          1.00, 1.06),
   'grandma': ('en_US-kristin-medium',      1.00, 1.06),
   'dad':     ('en_US-hfc_male-medium',     1.00, 1.04),   # warm, gentle, masculine
-  'pa':      ('en_US-joe-medium',          0.97, 1.08),   # grandpa: deeper, a touch slower
+  'pa':      ('en_US-libritts_r-medium',   1.00, 1.08, 8),   # grandpa: speaker 8 of the multi-speaker model (auditioned)
   'teacher': ('en_GB-jenny_dioco-medium',  1.00, 1.06),
   'charlotte': ('en_US-hfc_female-medium', 1.02, 1.02),  # Nina's big sister, 15
   'theo':    ('en_US-kathleen-low',        1.04, 0.98),
@@ -63,8 +64,10 @@ NUMS   = ['One!','Two!','Three!','Four!','Five!','Six!']
 
 clips = {}
 def add(cid, text, who=None, slow=None):
-    model, pitch, length = CAST[who] if who else NARR
-    clips[cid] = (text, model, pitch, length if slow is None else slow)
+    spec = CAST[who] if who else NARR
+    model, pitch, length = spec[0], spec[1], spec[2]
+    sid = spec[3] if len(spec) > 3 else None
+    clips[cid] = (text, model, pitch, length if slow is None else slow, sid)
 
 add('hi',     "Hi Nina! Let's go pick flowers!")
 add('basket', "Your basket is full! Great job, Nina!")
@@ -99,7 +102,7 @@ BYES = {   # everyone is off to their own nap too
   'mom':     "Bye bye, Nina! It's nap time for everyone. I love you!",
   'dad':     "Bye bye, Nina! It's my nap time too. See you soon!",
   'grandma': "Goodbye, Nina. It's nap time for me too. Sleep well, my darling.",
-  'pa':      "Bye bye, Nina. Pa is going for a nap too. See you soon, kiddo.",
+  'pa':      "Bye bye, Nina. Pa is going for a nap too. See you soon, sweetie.",
   'teacher': "Bye Nina! It's our nap time too. Have a lovely nap.",
   'charlotte': "Bye Nina! I'm going for a nap too. See you later!",
   'theo':    "Bye Nina! Time for my nap!",
@@ -128,8 +131,8 @@ print("existing clips kept: %d   new lines to render: %d" % (len(keep), len(todo
 # ---- synthesise, grouped by model so each one loads exactly once ----
 shutil.rmtree(TMP, ignore_errors=True); os.makedirs(TMP)
 jobs = {}
-for cid,(text,model,pitch,length) in todo.items():
-    jobs.setdefault(model, []).append({'id':cid, 'text':text, 'length':length})
+for cid,(text,model,pitch,length,sid) in todo.items():
+    jobs.setdefault(model, []).append({'id':cid, 'text':text, 'length':length, 'sid':sid})
 
 worker = os.path.join(TMP, "_synth.py")
 open(worker,"w").write('''
@@ -139,7 +142,7 @@ spec = json.load(open(sys.argv[1]))
 voice = PiperVoice.load(spec["model"])
 for j in spec["jobs"]:
     with wave.open(j["out"], "wb") as w:
-        voice.synthesize_wav(j["text"], w, SynthesisConfig(length_scale=j["length"]))
+        voice.synthesize_wav(j["text"], w, SynthesisConfig(length_scale=j["length"], speaker_id=j.get("sid")))
 print("ok", len(spec["jobs"]))
 ''')
 for model, js in jobs.items():
@@ -162,7 +165,7 @@ def chain(p):
     return pitch + TRIM + "," + POST
 
 out, total = dict(keep), 0
-for cid,(text,model,pitch,length) in todo.items():
+for cid,(text,model,pitch,length,sid) in todo.items():
     wav = os.path.join(TMP, cid+'.wav'); m4a = os.path.join(TMP, cid+'.m4a')
     subprocess.run(['ffmpeg','-y','-loglevel','error','-i',wav,'-af',chain(pitch),
                     '-ar','22050','-ac','1','-c:a','aac','-b:a','32k', m4a], check=True)
