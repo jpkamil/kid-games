@@ -16,6 +16,7 @@ Setup (once):
 Then:
     python3 build_voice.py && ./build.sh      # renders only lines not yet in voice_clips.js
     python3 build_voice.py --all              # re-render everything (changes every clip)
+    python3 build_voice.py --redo=thx_dad,bye_dad   # re-render just those ids (a recast or a rewritten line)
 """
 import base64, io, json, os, shutil, subprocess, sys, wave
 
@@ -26,18 +27,22 @@ OUT, TMP = "voice_clips.js", "voicebuild"
 
 # voice model, pitch/formant factor applied afterwards, phoneme length (>1 = slower)
 NARR = ('en_US-amy-medium', 1.00, 1.06)
+# Auditioned with Jeremy 2026-09-03. Pitching a man's voice up by a fifth made
+# the boys sound like chipmunks and the lowered, slowed Grandma sounded ominous;
+# small shifts of the right base voice read as people.
 CAST = {
   'mom':     ('en_US-amy-medium',          1.00, 1.06),
-  'grandma': ('en_US-kristin-medium',      0.95, 1.16),   # slower and lower
-  'dad':     ('en_US-ryan-high',           0.99, 1.04),
+  'grandma': ('en_US-kristin-medium',      1.00, 1.06),
+  'dad':     ('en_US-hfc_male-medium',     1.00, 1.04),   # warm, gentle, masculine
   'teacher': ('en_GB-jenny_dioco-medium',  1.00, 1.06),
-  'theo':    ('en_US-ryan-high',           1.20, 1.00),   # pitched up into a boy
-  'oliver':  ('en_US-ryan-high',           1.13, 1.02),
-  'mia':     ('en_US-hfc_female-medium',   1.08, 1.04),
+  'charlotte': ('en_US-hfc_female-medium', 1.02, 1.02),  # Nina's big sister, 15
+  'theo':    ('en_US-kathleen-low',        1.04, 0.98),
+  'oliver':  ('en_US-hfc_male-medium',     1.10, 1.00),   # Daddy's voice, a tenth up
+  'mia':     ('en_GB-alba-medium',         1.06, 1.00),
 }
 FOR_LINE = {
   'mom':'Flowers for Mommy!', 'dad':'Flowers for Daddy!', 'grandma':'Flowers for Grandma!',
-  'teacher':'Flowers for your teacher!', 'theo':'Flowers for Theo!',
+  'teacher':'Flowers for your teacher!', 'charlotte':'Flowers for Charlotte!', 'theo':'Flowers for Theo!',
   'oliver':'Flowers for Oliver!', 'mia':'Flowers for your friend Mia!',
 }
 THANKS = {
@@ -45,6 +50,7 @@ THANKS = {
   'dad':'Wow, thank you Nina!',
   'grandma':'Oh Nina, they are beautiful. Thank you!',
   'teacher':'Thank you Nina! What lovely flowers.',
+  'charlotte':"Aww, thank you Nina! You're the best little sister.",
   'theo':'Thanks Nina! These are so pretty.',
   'oliver':'Thank you Nina! I love flowers.',
   'mia':'Thank you Nina! You are the best.',
@@ -87,10 +93,15 @@ add('goats_done', "You got all the flowers back! Good job, Nina!")
 # nap time: everyone says goodbye in their own voice, then the game sleeps
 add('nap',  "Farewell Nina! It's our nap time now. Bye bye!")
 add('nap2', "Night night, Nina. See you after nap time!")
-BYES = {
-  'mom':'Bye bye Nina! I love you!', 'dad':'Bye Nina! See you soon!', 'grandma':'Goodbye sweetheart. Sleep well.',
-  'teacher':'Bye Nina! Have a lovely nap.', 'theo':'Bye Nina!', 'oliver':'See you later, Nina!',
-  'mia':'Bye Nina! Night night!',
+BYES = {   # everyone is off to their own nap too
+  'mom':     "Bye bye, Nina! It's nap time for everyone. I love you!",
+  'dad':     "Bye bye, Nina! It's my nap time too. See you soon!",
+  'grandma': "Goodbye, Nina. It's nap time for me too. Sleep well, my darling.",
+  'teacher': "Bye Nina! It's our nap time too. Have a lovely nap.",
+  'charlotte': "Bye Nina! I'm going for a nap too. See you later!",
+  'theo':    "Bye Nina! Time for my nap!",
+  'oliver':  "See you later, Nina! I'm going for a nap too.",
+  'mia':     "Bye Nina! It's nap time! Night night!",
 }
 for k,v in BYES.items(): add('bye_'+k, v, who=k)
 
@@ -105,6 +116,9 @@ if '--all' not in sys.argv and os.path.exists(OUT):
     if m:
         old = json.loads(m.group(1))
         keep = {k:v for k,v in old.items() if k in clips}
+for a in sys.argv[1:]:
+    if a.startswith('--redo='):
+        for rid in a[7:].split(','): keep.pop(rid, None)
 todo = {k:v for k,v in clips.items() if k not in keep}
 print("existing clips kept: %d   new lines to render: %d" % (len(keep), len(todo)))
 

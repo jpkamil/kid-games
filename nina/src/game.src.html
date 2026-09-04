@@ -1022,6 +1022,9 @@ var PEOPLE = [
   {id:'dad',     label:'Daddy',   hair:'#4a3020', hairDark:'#3a2416', short:true, tall:true,
                  shirt:'#6fc9ff', pants:'#3d5f86', belt:'#2b4360', collar:'#eaf7ff',
                  shoe:'#2f4256'},
+  /* Charlotte, Nina's big sister: long brown hair, a sundress, white sneakers */
+  {id:'charlotte', label:'Charlotte', hair:'#6b4424', hairDark:'#4e3018', longHair:true,
+                 dress:'#b8e0ff', collar:'#ffffff', belt:'#f0b429', necklace:'#ff9fc4', shoe:'#ffffff', tall:true},
   {id:'teacher', label:'my teacher', hair:'#3a2a1a', hairDark:'#2a1c10', bun:true, glasses:true,
                  dress:'#7ee0a8', collar:'#ffffff', belt:'#3fa870', shoe:'#3fa870'},
   {id:'theo',    label:'Theo',    hair:'#6b4020', hairDark:'#4e2e14', kid:true,
@@ -2573,8 +2576,8 @@ var Nap = (function(){
       /* everyone dances: two rows, arms swapping on the beat */
       var ps=Math.min(W,H)*0.058, wide=W>H*1.15;
       for(var p=0;p<PEOPLE.length;p++){
-        var row = wide? 0 : (p<4?0:1), col = wide? p : (p<4? p : p-4), n = wide? 7 : (row===0?4:3);
-        var px = W*(0.5+(col-(n-1)/2)*(wide?0.13:0.22)), py = H*(wide?0.60:(row===0?0.60:0.74));
+        var row = wide? 0 : (p<4?0:1), col = wide? p : (p<4? p : p-4), n = wide? PEOPLE.length : (row===0?4:PEOPLE.length-4);
+        var px = W*(0.5+(col-(n-1)/2)*(wide?0.115:0.22)), py = H*(wide?0.60:(row===0?0.60:0.74));
         var beat = Math.floor(t*2+p*0.5)%2===0;
         var jump = Math.abs(Math.sin(t*4+p))*U*2.5;
         ctx.save(); ctx.translate(px, py-jump); ctx.rotate(Math.sin(t*4+p)*0.06);
@@ -2594,8 +2597,8 @@ var Nap = (function(){
       ctx.save(); ctx.globalAlpha=0.6;
       var ps2=Math.min(W,H)*0.05, wide2=W>H*1.15;
       for(var q=0;q<PEOPLE.length;q++){
-        var row2 = wide2? 0 : (q<4?0:1), col2 = wide2? q : (q<4? q : q-4), n2 = wide2? 7 : (row2===0?4:3);
-        drawPerson(W*(0.5+(col2-(n2-1)/2)*(wide2?0.13:0.22)), H*(wide2?0.66:(row2===0?0.66:0.78)), ps2, PEOPLE[q], 0, false, true);
+        var row2 = wide2? 0 : (q<4?0:1), col2 = wide2? q : (q<4? q : q-4), n2 = wide2? PEOPLE.length : (row2===0?4:PEOPLE.length-4);
+        drawPerson(W*(0.5+(col2-(n2-1)/2)*(wide2?0.115:0.22)), H*(wide2?0.66:(row2===0?0.66:0.78)), ps2, PEOPLE[q], 0, false, true);
       }
       drawGirl(W*0.5, H*0.90, U*4.4, {t:0, bob:false, armUp:false, asleep:true});
       ctx.restore();
